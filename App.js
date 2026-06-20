@@ -7,7 +7,6 @@ import { Text, Platform } from 'react-native';
 import HomeScreen from './src/screens/HomeScreen';
 import NuevoGastoScreen from './src/screens/NuevoGastoScreen';
 import EstadisticasScreen from './src/screens/EstadisticasScreen';
-import PerfilScreen from './src/screens/PerfilScreen';
 import { COLORS } from './src/constants/theme';
 
 const Tab = createBottomTabNavigator();
