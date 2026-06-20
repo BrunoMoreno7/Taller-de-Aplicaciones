@@ -1,176 +1,107 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  Alert,
+  View, Text, StyleSheet, ScrollView, TouchableOpacity,
+  Modal, Switch, FlatList
 } from 'react-native';
-import { MaterialCommunityIcons } from '@expo/vector-icons'; // O la librería de iconos que uses
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useTheme } from '../context/ThemeContext';
 import AppHeader from '../components/AppHeader';
-import { COLORS } from '../constants/theme';
-import { useGastos } from '../hooks/useGastos'; // Asumiendo que aquí tendrás las funciones para borrar
+
+const PRESET_COLORS = ['#6200EE', '#007AFF', '#4CAF50', '#FF9800', '#E91E63', '#000000'];
 
 export default function OpcionesScreen() {
-  const { limpiarGastos } = useGastos(); // Deberás implementar esto en tu hook
-
-  const handleToggleTheme = () => {
-    Alert.alert('Tema', 'Funcionalidad de tema oscuro próximamente.');
-  };
-
-  const handleExportData = (tipo) => {
-    Alert.alert(
-      'Exportar Datos',
-      `La exportación en formato ${tipo} por email estará disponible pronto.`
-    );
-  };
-
-  const confirmarBorrado = (modo) => {
-    const mensaje = modo === 'cero' 
-      ? "¿Estás seguro de poner todos los montos en $0? Esta acción no se puede deshacer."
-      : "¿Estás seguro de eliminar todos los conceptos? Se borrará todo el historial.";
-
-    Alert.alert(
-      "Confirmar acción",
-      mensaje,
-      [
-        { text: "Cancelar", style: "cancel" },
-        { 
-          text: "Confirmar", 
-          style: "destructive", 
-          onPress: () => {
-            // Aquí llamarías a la función de tu hook
-            console.log(`Ejecutando: ${modo}`);
-            Alert.alert("Éxito", "Operación realizada correctamente.");
-          } 
-        }
-      ]
-    );
-  };
-
-  const OptionButton = ({ icon, title, subtitle, onPress, color = COLORS.text, isDestructive = false }) => (
-    <TouchableOpacity 
-      style={styles.optionItem} 
-      onPress={onPress}
-      activeOpacity={0.7}
-    >
-      <View style={[styles.iconContainer, { backgroundColor: isDestructive ? '#FFE5E5' : COLORS.primaryLight + '44' }]}>
-        <MaterialCommunityIcons name={icon} size={24} color={isDestructive ? '#FF4444' : COLORS.primary} />
-      </View>
-      <View style={styles.optionTextContainer}>
-        <Text style={[styles.optionTitle, { color: isDestructive ? '#FF4444' : color }]}>{title}</Text>
-        {subtitle && <Text style={styles.optionSubtitle}>{subtitle}</Text>}
-      </View>
-      <MaterialCommunityIcons name="chevron-right" size={24} color={COLORS.textMuted} />
-    </TouchableOpacity>
-  );
+  const { isDarkMode, setIsDarkMode, accentColor, setAccentColor, theme } = useTheme();
+  const [modalVisible, setModalVisible] = useState(false);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <AppHeader />
-      
+
       <ScrollView contentContainerStyle={styles.scroll}>
-        <Text style={styles.sectionTitle}>Apariencia</Text>
-        <OptionButton 
-          icon="theme-light-dark" 
-          title="Cambiar Tema" 
-          subtitle="Alternar entre modo claro y oscuro"
-          onPress={handleToggleTheme}
-        />
+        <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Apariencia</Text>
 
-        <Text style={styles.sectionTitle}>Datos y Exportación</Text>
-        <OptionButton 
-          icon="file-pdf-box" 
-          title="Exportar como PDF" 
-          subtitle="Enviar reporte mensual por email"
-          onPress={() => handleExportData('PDF')}
-        />
-        <OptionButton 
-          icon="code-json" 
-          title="Exportar como JSON" 
-          subtitle="Copia de seguridad de tus datos"
-          onPress={() => handleExportData('JSON')}
-        />
+        <TouchableOpacity
+          style={[styles.optionItem, { backgroundColor: theme.colors.card }]}
+          onPress={() => setModalVisible(true)}
+        >
+          <View style={styles.iconContainer}>
+            <MaterialCommunityIcons name="palette" size={24} color={accentColor} />
+          </View>
+          <View style={styles.optionTextContainer}>
+            <Text style={[styles.optionTitle, { color: theme.colors.text }]}>Personalizar Tema</Text>
+            <Text style={styles.optionSubtitle}>Colores y Modo Oscuro</Text>
+          </View>
+          <MaterialCommunityIcons name="chevron-right" size={24} color="#CCC" />
+        </TouchableOpacity>
 
-        <Text style={[styles.sectionTitle, { color: '#FF4444' }]}>Zona de Peligro</Text>
-        <View style={styles.dangerZone}>
-          <OptionButton 
-            icon="restart" 
-            title="Reiniciar a $0" 
-            subtitle="Mantener categorías pero limpiar montos"
-            onPress={() => confirmarBorrado('cero')}
-            isDestructive
-          />
-          <OptionButton 
-            icon="trash-can-outline" 
-            title="Borrar todo" 
-            subtitle="Eliminar todos los registros permanentemente"
-            onPress={() => confirmarBorrado('borrar')}
-            isDestructive
-          />
-        </View>
+        {/* --- MODAL DE PERSONALIZACIÓN --- */}
+        <Modal
+          animationType="slide"
+          transparent={true}
+          visible={modalVisible}
+          onRequestClose={() => setModalVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.modalContent, { backgroundColor: theme.colors.card }]}>
+              <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Personalizar</Text>
+
+              {/* Toggle Modo Oscuro */}
+              <View style={styles.settingRow}>
+                <Text style={{ color: theme.colors.text, fontSize: 16 }}>Modo Oscuro</Text>
+                <Switch
+                  value={isDarkMode}
+                  onValueChange={setIsDarkMode}
+                  trackColor={{ false: "#767577", true: accentColor }}
+                />
+              </View>
+
+              {/* Color Picker */}
+              <Text style={[styles.label, { color: theme.colors.text }]}>Color de énfasis</Text>
+              <View style={styles.colorGrid}>
+                {PRESET_COLORS.map((color) => (
+                  <TouchableOpacity
+                    key={color}
+                    style={[
+                      styles.colorCircle,
+                      { backgroundColor: color, borderWidth: accentColor === color ? 3 : 0 }
+                    ]}
+                    onPress={() => setAccentColor(color)}
+                  />
+                ))}
+              </View>
+
+              <TouchableOpacity
+                style={[styles.closeButton, { backgroundColor: accentColor }]}
+                onPress={() => setModalVisible(false)}
+              >
+                <Text style={styles.closeButtonText}>Listo</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
       </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
-  scroll: {
-    padding: 20,
-    paddingBottom: 40,
-  },
-  sectionTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: COLORS.textSecondary,
-    marginTop: 25,
-    marginBottom: 10,
-    textTransform: 'uppercase',
-    letterSpacing: 1,
-  },
-  optionItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.white,
-    padding: 15,
-    borderRadius: 16,
-    marginBottom: 10,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-  },
-  iconContainer: {
-    width: 45,
-    height: 45,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 15,
-  },
-  optionTextContainer: {
-    flex: 1,
-  },
-  optionTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  optionSubtitle: {
-    fontSize: 12,
-    color: COLORS.textMuted,
-    marginTop: 2,
-  },
-  dangerZone: {
-    borderWidth: 1,
-    borderColor: '#FF444433',
-    borderRadius: 20,
-    padding: 5,
-    backgroundColor: '#FFF5F5',
-  }
+  container: { flex: 1 },
+  scroll: { padding: 20 },
+  sectionTitle: { fontSize: 14, fontWeight: '700', marginBottom: 10, marginTop: 20 },
+  optionItem: { flexDirection: 'row', alignItems: 'center', padding: 15, borderRadius: 16, elevation: 2 },
+  iconContainer: { marginRight: 15 },
+  optionTextContainer: { flex: 1 },
+  optionTitle: { fontSize: 16, fontWeight: '700' },
+  optionSubtitle: { fontSize: 12, color: '#888' },
+
+  // Modal Styles
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center' },
+  modalContent: { width: '85%', padding: 25, borderRadius: 20, elevation: 10 },
+  modalTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 20, textAlign: 'center' },
+  settingRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 25 },
+  label: { fontSize: 16, marginBottom: 15 },
+  colorGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', marginBottom: 25 },
+  colorCircle: { width: 45, height: 45, borderRadius: 22.5, margin: 8, borderColor: '#FFF' },
+  closeButton: { padding: 15, borderRadius: 12, alignItems: 'center' },
+  closeButtonText: { color: 'white', fontWeight: 'bold' }
 });

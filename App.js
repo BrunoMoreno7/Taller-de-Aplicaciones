@@ -4,33 +4,27 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Text, Platform } from 'react-native';
 
-// IMPORTANTE: Si quieres usar MaterialCommunityIcons, debes importarlo:
-// import { MaterialCommunityIcons } from '@expo/vector-icons';
-
+// Pantallas
 import HomeScreen from './src/screens/HomeScreen';
 import NuevoGastoScreen from './src/screens/NuevoGastoScreen';
 import EstadisticasScreen from './src/screens/EstadisticasScreen';
 import OpcionesScreen from './src/screens/OpcionesScreen';
-import { COLORS } from './src/constants/theme';
+
+// Tema y Contexto
+import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
 function TabIcon({ name, focused }) {
-  // Añadimos "Opciones" aquí para que coincida con el nombre de la ruta
   const icons = {
     Home: '🏠',
     Estadisticas: '📊',
-    Opciones: '⚙️', // Icono de engranaje (Emoji)
+    Opciones: '⚙️',
   };
 
   return (
-    <Text
-      style={{
-        fontSize: 22,
-        opacity: focused ? 1 : 0.5,
-      }}
-    >
+    <Text style={{ fontSize: 22, opacity: focused ? 1 : 0.5 }}>
       {icons[name] || '❓'}
     </Text>
   );
@@ -43,17 +37,16 @@ function HomeStack() {
       <Stack.Screen
         name="NuevoGasto"
         component={NuevoGastoScreen}
-        options={{
-          animation: 'slide_from_bottom',
-        }}
+        options={{ animation: 'slide_from_bottom' }}
       />
-      {/* Mantenemos Opciones aquí también por si quieres navegar desde el Header */}
       <Stack.Screen name="Opciones" component={OpcionesScreen} />
     </Stack.Navigator>
   );
 }
 
-export default function App() {
+function AppContent() {
+  const { accentColor, theme } = useTheme();
+
   return (
     <NavigationContainer>
       <Tab.Navigator
@@ -62,23 +55,20 @@ export default function App() {
           tabBarIcon: ({ focused }) => (
             <TabIcon name={route.name} focused={focused} />
           ),
-          tabBarActiveTintColor: COLORS.text,
-          tabBarInactiveTintColor: COLORS.textSecondary,
+          // Cuando la barra es de color, los iconos activos suelen ser blancos
+          tabBarActiveTintColor: '#FFFFFF',
+          tabBarInactiveTintColor: 'rgba(255, 255, 255, 0.5)',
           tabBarStyle: {
-            backgroundColor: COLORS.primaryLight,
+            backgroundColor: accentColor, // <--- AQUÍ CAMBIA EL COLOR DE LA BARRA INFERIOR
             borderTopWidth: 0,
-            height: Platform.OS === 'ios' ? 80 : 60,
-            paddingBottom: Platform.OS === 'ios' ? 20 : 8,
+            height: Platform.OS === 'ios' ? 80 : 65,
+            paddingBottom: Platform.OS === 'ios' ? 20 : 10,
             paddingTop: 8,
             elevation: 8,
-            shadowColor: '#000',
-            shadowOffset: { width: 0, height: -2 },
-            shadowOpacity: 0.1,
-            shadowRadius: 6,
           },
           tabBarLabelStyle: {
             fontSize: 11,
-            fontWeight: '600',
+            fontWeight: '700',
           },
         })}
       >
@@ -95,12 +85,17 @@ export default function App() {
         <Tab.Screen
           name="Opciones"
           component={OpcionesScreen}
-          options={{
-            tabBarLabel: 'Ajustes'
-            // Quitamos el tabBarIcon de aquí porque ya lo maneja el TabIcon global arriba
-          }}
+          options={{ tabBarLabel: 'Ajustes' }}
         />
       </Tab.Navigator>
     </NavigationContainer>
+  );
+}
+
+export default function App() {
+  return (
+    <ThemeProvider>
+      <AppContent />
+    </ThemeProvider>
   );
 }

@@ -1,35 +1,29 @@
 import React from 'react';
-import { View, Text, StyleSheet, StatusBar, Platform } from 'react-native';
-import { COLORS } from '../constants/theme';
+import { View, Text, StyleSheet, SafeAreaView } from 'react-native';
+import { useTheme } from '../context/ThemeContext'; // Importar el hook
 
-export default function AppHeader({ title = 'Moneys Gone😞' }) {
+export default function AppHeader() {
+  const { accentColor } = useTheme(); // Obtener el color elegido
+
   return (
-    <>
-      <StatusBar backgroundColor={COLORS.primary} barStyle="light-content" />
-      <View style={styles.header}>
-        <Text style={styles.title}>{title}</Text>
+    <SafeAreaView style={{ backgroundColor: accentColor }}>
+      <View style={[styles.header, { backgroundColor: accentColor }]}>
+        <Text style={styles.title}>Money's Gone</Text>
       </View>
-    </>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
   header: {
-    backgroundColor: COLORS.primary,
-    paddingTop: Platform.OS === 'android' ? 0 : 0,
-    paddingVertical: 16,
-    alignItems: 'center',
+    height: 60,
     justifyContent: 'center',
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
+    alignItems: 'center',
+    // Quitamos el color fijo de aquí para que mande el estilo en línea
   },
   title: {
-    color: COLORS.white,
+    color: 'white',
     fontSize: 20,
-    fontWeight: '700',
-    letterSpacing: 0.5,
+    fontWeight: 'bold',
   },
 });

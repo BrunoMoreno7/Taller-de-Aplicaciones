@@ -1,6 +1,5 @@
 import React from 'react';
-import {
-  View,
+import {  View,
   Text,
   StyleSheet,
   FlatList,
@@ -8,10 +7,12 @@ import {
   Alert,
 } from 'react-native';
 import AppHeader from '../components/AppHeader';
-import { COLORS, FONTS } from '../constants/theme';
+import { COLORS } from '../constants/theme';
 import { useGastos } from '../hooks/useGastos';
+import { useTheme } from '../context/ThemeContext'; // 1. Importar el hook
 
 function GastoItem({ item, onEliminar }) {
+  const { theme } = useTheme(); // Usar tema en el item
   const colores = COLORS.categories[item.categoria] || COLORS.categories['Otro'];
 
   const fecha = new Date(item.fecha);
@@ -33,7 +34,7 @@ function GastoItem({ item, onEliminar }) {
 
   return (
     <TouchableOpacity
-      style={styles.gastoItem}
+      style={[styles.gastoItem, { backgroundColor: theme.colors.card }]} // Fondo dinámico
       onLongPress={confirmarEliminar}
       activeOpacity={0.75}
     >
@@ -44,13 +45,13 @@ function GastoItem({ item, onEliminar }) {
       </View>
       <View style={styles.gastoInfo}>
         {item.descripcion ? (
-          <Text style={styles.descripcion} numberOfLines={1}>
+          <Text style={[styles.descripcion, { color: theme.colors.text }]} numberOfLines={1}>
             {item.descripcion}
           </Text>
         ) : null}
         <Text style={styles.fechaText}>{fechaStr}</Text>
       </View>
-      <Text style={styles.montoText}>
+      <Text style={[styles.montoText, { color: theme.colors.text }]}>
         ${item.monto.toLocaleString('es-UY')}
       </Text>
     </TouchableOpacity>
@@ -59,6 +60,7 @@ function GastoItem({ item, onEliminar }) {
 
 export default function HomeScreen({ navigation }) {
   const { gastosDelMes, totalMes, eliminarGasto } = useGastos();
+  const { theme, accentColor } = useTheme(); // 2. Obtener tema y color de acento
 
   const mesActual = new Date().toLocaleDateString('es-UY', {
     month: 'long',
@@ -67,7 +69,7 @@ export default function HomeScreen({ navigation }) {
 
   const renderEmpty = () => (
     <View style={styles.emptyContainer}>
-      <Text style={styles.emptyTitle}>Sin gastos este mes</Text>
+      <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>Sin gastos este mes</Text>
       <Text style={styles.emptySubtitle}>
         Tocá el botón + para registrar tu primer gasto
       </Text>
@@ -75,10 +77,11 @@ export default function HomeScreen({ navigation }) {
   );
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <AppHeader />
 
-      <View style={styles.resumenCard}>
+      {/* La tarjeta de resumen ahora usa el accentColor elegido */}
+      <View style={[styles.resumenCard, { backgroundColor: accentColor, shadowColor: accentColor }]}>
         <Text style={styles.resumenLabel}>
           Total {mesActual.charAt(0).toUpperCase() + mesActual.slice(1)}
         </Text>
@@ -92,7 +95,7 @@ export default function HomeScreen({ navigation }) {
 
       {/* Lista de gastos */}
       <View style={styles.listContainer}>
-        <Text style={styles.sectionTitle}>Últimos Gastos</Text>
+        <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Últimos Gastos</Text>
 
         <FlatList
           data={gastosDelMes}
@@ -107,8 +110,10 @@ export default function HomeScreen({ navigation }) {
           showsVerticalScrollIndicator={false}
         />
       </View>
+
+      {/* El FAB también usa el accentColor */}
       <TouchableOpacity
-        style={styles.fab}
+        style={[styles.fab, { backgroundColor: accentColor, shadowColor: accentColor }]}
         onPress={() => navigation.navigate('NuevoGasto')}
         activeOpacity={0.85}
       >
@@ -121,10 +126,8 @@ export default function HomeScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
   },
   resumenCard: {
-    backgroundColor: COLORS.primary,
     marginHorizontal: 16,
     marginTop: 16,
     marginBottom: 8,
@@ -132,7 +135,6 @@ const styles = StyleSheet.create({
     padding: 20,
     alignItems: 'center',
     elevation: 3,
-    shadowColor: COLORS.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -145,7 +147,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   resumenMonto: {
-    color: COLORS.white,
+    color: '#FFFFFF',
     fontSize: 36,
     fontWeight: '900',
     letterSpacing: -1,
@@ -162,7 +164,6 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 22,
     fontWeight: '900',
-    color: COLORS.text,
     marginTop: 16,
     marginBottom: 12,
     letterSpacing: -0.5,
@@ -177,7 +178,6 @@ const styles = StyleSheet.create({
     paddingBottom: 80,
   },
   gastoItem: {
-    backgroundColor: COLORS.white,
     borderRadius: 12,
     padding: 14,
     marginBottom: 10,
@@ -206,38 +206,34 @@ const styles = StyleSheet.create({
   },
   descripcion: {
     fontSize: 13,
-    color: COLORS.text,
     fontWeight: '500',
   },
   fechaText: {
     fontSize: 11,
-    color: COLORS.textMuted,
+    color: '#888',
     marginTop: 2,
   },
   montoText: {
     fontSize: 16,
     fontWeight: '800',
-    color: COLORS.text,
     marginLeft: 8,
   },
   fab: {
     position: 'absolute',
     bottom: 24,
     right: 20,
-    backgroundColor: COLORS.primary,
     width: 56,
     height: 56,
     borderRadius: 28,
     alignItems: 'center',
     justifyContent: 'center',
     elevation: 6,
-    shadowColor: COLORS.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.4,
     shadowRadius: 8,
   },
   fabText: {
-    color: COLORS.white,
+    color: '#FFFFFF',
     fontSize: 28,
     fontWeight: '300',
     lineHeight: 32,
@@ -245,19 +241,14 @@ const styles = StyleSheet.create({
   emptyContainer: {
     alignItems: 'center',
   },
-  emptyEmoji: {
-    fontSize: 48,
-    marginBottom: 12,
-  },
   emptyTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: COLORS.text,
     marginBottom: 6,
   },
   emptySubtitle: {
     fontSize: 14,
-    color: COLORS.textSecondary,
+    color: '#888',
     textAlign: 'center',
     paddingHorizontal: 20,
   },
