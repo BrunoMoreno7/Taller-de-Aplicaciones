@@ -4,20 +4,26 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Text, Platform } from 'react-native';
 
+// IMPORTANTE: Si quieres usar MaterialCommunityIcons, debes importarlo:
+// import { MaterialCommunityIcons } from '@expo/vector-icons';
+
 import HomeScreen from './src/screens/HomeScreen';
 import NuevoGastoScreen from './src/screens/NuevoGastoScreen';
 import EstadisticasScreen from './src/screens/EstadisticasScreen';
+import OpcionesScreen from './src/screens/OpcionesScreen';
 import { COLORS } from './src/constants/theme';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
 function TabIcon({ name, focused }) {
+  // Añadimos "Opciones" aquí para que coincida con el nombre de la ruta
   const icons = {
     Home: '🏠',
     Estadisticas: '📊',
-    Perfil: '👤',
+    Opciones: '⚙️', // Icono de engranaje (Emoji)
   };
+
   return (
     <Text
       style={{
@@ -25,7 +31,7 @@ function TabIcon({ name, focused }) {
         opacity: focused ? 1 : 0.5,
       }}
     >
-      {icons[name]}
+      {icons[name] || '❓'}
     </Text>
   );
 }
@@ -41,6 +47,8 @@ function HomeStack() {
           animation: 'slide_from_bottom',
         }}
       />
+      {/* Mantenemos Opciones aquí también por si quieres navegar desde el Header */}
+      <Stack.Screen name="Opciones" component={OpcionesScreen} />
     </Stack.Navigator>
   );
 }
@@ -74,15 +82,23 @@ export default function App() {
           },
         })}
       >
-         <Tab.Screen
+        <Tab.Screen
           name="Home"
           component={HomeStack}
           options={{ tabBarLabel: 'Inicio' }}
-        /> 
+        />
         <Tab.Screen
           name="Estadisticas"
           component={EstadisticasScreen}
           options={{ tabBarLabel: 'Estadísticas' }}
+        />
+        <Tab.Screen
+          name="Opciones"
+          component={OpcionesScreen}
+          options={{
+            tabBarLabel: 'Ajustes'
+            // Quitamos el tabBarIcon de aquí porque ya lo maneja el TabIcon global arriba
+          }}
         />
       </Tab.Navigator>
     </NavigationContainer>
