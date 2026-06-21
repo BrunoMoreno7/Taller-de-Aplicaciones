@@ -70,6 +70,13 @@ export function useGastos() {
     emitirCambio();
   }, []);
 
+  const editarCategoria = useCallback(async (id, nuevosDatos) => {
+    categoriasEnMemoria = categoriasEnMemoria.map(c =>
+      c.id === id ? { ...c, ...nuevosDatos } : c
+    );
+    emitirCambio();
+  }, []);
+
   const eliminarCategoria = useCallback(async (id) => {
     categoriasEnMemoria = categoriasEnMemoria.filter((c) => c.id !== id);
     emitirCambio();
@@ -117,6 +124,7 @@ export function useGastos() {
     agregarGasto,
     eliminarGasto,
     agregarCategoria, // <--- Nueva función expuesta
+    editarCategoria,
     eliminarCategoria, // <--- Nueva función expuesta
     limpiarGastos,     // <--- Para la pantalla de Opciones
     eliminarTodo       // <--- Para la pantalla de Opciones
