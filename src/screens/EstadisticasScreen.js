@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react'; // Usamos useMemo para cálculos precisos
+import React, { useMemo } from 'react';
 import {
   View,
   Text,
@@ -9,40 +9,41 @@ import {
 } from 'react-native';
 import { PieChart } from 'react-native-gifted-charts';
 import AppHeader from '../components/AppHeader';
-import { COLORS } from '../constants/theme';
 import { useGastos } from '../hooks/useGastos';
 import { useTheme } from '../context/ThemeContext';
 
 export default function EstadisticasScreen() {
-  const { porCategoria, totalMes } = useGastos();
+  // 1. Obtenemos 'categorias' (dinámicas) del hook
+  const { porCategoria, categorias } = useGastos();
   const { theme, accentColor } = useTheme();
 
   const mesActual = new Date().toLocaleString('es-UY', { month: 'long' });
-  const categoriaColors = COLORS.categories;
 
-  // Calculamos los datos de la gráfica y nos aseguramos de que totalMes sea numérico
+  // 2. Lógica de procesamiento de datos corregida
   const { chartData, totalCalculado } = useMemo(() => {
     const entries = Object.entries(porCategoria);
 
-    // Calculamos un total local para asegurar precisión en los porcentajes
+    // Calculamos el total real basado en lo que hay en porCategoria
     const total = entries.reduce((acc, [_, monto]) => acc + monto, 0);
 
     const data = entries
-      .map(([categoria, monto]) => {
-        const colorEntry = categoriaColors[categoria] || categoriaColors['Otro'];
+      .map(([nombreCat, monto]) => {
+        // BUSCAMOS EL COLOR EN LA LISTA DINÁMICA DE CATEGORÍAS
+        const encontrada = categorias.find(c => c.nombre === nombreCat);
+        const colorFinal = encontrada ? encontrada.color : '#CCC';
+
         return {
           value: monto,
-          color: colorEntry.bg,
-          textColor: colorEntry.text ?? colorEntry.bg,
-          categoria,
+          color: colorFinal,
+          categoria: nombreCat,
           monto,
-          text: categoria,
+          text: nombreCat,
         };
       })
       .sort((a, b) => b.monto - a.monto);
 
     return { chartData: data, totalCalculado: total };
-  }, [porCategoria]);
+  }, [porCategoria, categorias]); // Agregamos categorias como dependencia
 
   const pieData = chartData.map(({ value, color, text }) => ({ value, color, text }));
 
@@ -75,7 +76,7 @@ export default function EstadisticasScreen() {
               radius={90}
               innerRadius={50}
               showText={false}
-              // CORRECCIÓN MODO OSCURO: El centro del donut ahora usa el fondo de la tarjeta
+              // El centro del donut usa el fondo de la app para que no se vea el parche blanco
               innerCircleColor={theme.colors.background}
               centerLabelComponent={() => (
                 <View style={{ alignItems: 'center' }}>
@@ -97,10 +98,11 @@ export default function EstadisticasScreen() {
           {chartData.length === 0 ? (
             <View style={styles.emptyState}>
               <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>Sin estadísticas aún</Text>
+              <Text style={styles.emptySubtitle}>Registrá gastos para ver el desglose</Text>
             </View>
           ) : (
             chartData.map(({ categoria, monto, color }) => {
-              // CORRECCIÓN PORCENTAJES: Uso de totalCalculado para evitar errores de división
+              // Cálculo de porcentaje dinámico y seguro
               const porcentaje = totalCalculado > 0
                 ? ((monto / totalCalculado) * 100).toFixed(1)
                 : "0.0";

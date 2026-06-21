@@ -1,5 +1,6 @@
 import React from 'react';
-import {  View,
+import {
+  View,
   Text,
   StyleSheet,
   FlatList,
@@ -7,13 +8,15 @@ import {  View,
   Alert,
 } from 'react-native';
 import AppHeader from '../components/AppHeader';
-import { COLORS } from '../constants/theme';
 import { useGastos } from '../hooks/useGastos';
-import { useTheme } from '../context/ThemeContext'; // 1. Importar el hook
+import { useTheme } from '../context/ThemeContext';
 
-function GastoItem({ item, onEliminar }) {
-  const { theme } = useTheme(); // Usar tema en el item
-  const colores = COLORS.categories[item.categoria] || COLORS.categories['Otro'];
+// Pasamos 'categorias' como prop a GastoItem
+function GastoItem({ item, onEliminar, categorias }) {
+  const { theme } = useTheme();
+
+  // Buscamos el color en nuestra lista dinámica de categorías
+  const colorCat = categorias.find(c => c.nombre === item.categoria)?.color || '#CCC';
 
   const fecha = new Date(item.fecha);
   const fechaStr = fecha.toLocaleDateString('es-UY', {
@@ -34,15 +37,17 @@ function GastoItem({ item, onEliminar }) {
 
   return (
     <TouchableOpacity
-      style={[styles.gastoItem, { backgroundColor: theme.colors.card }]} // Fondo dinámico
+      style={[styles.gastoItem, { backgroundColor: theme.colors.card }]}
       onLongPress={confirmarEliminar}
       activeOpacity={0.75}
     >
-      <View style={[styles.categoriaTag, { backgroundColor: colores.bg }]}>
-        <Text style={[styles.categoriaText, { color: colores.text }]}>
+      {/* Usamos colorCat para el fondo del tag y blanco para el texto por contraste */}
+      <View style={[styles.categoriaTag, { backgroundColor: colorCat }]}>
+        <Text style={[styles.categoriaText, { color: '#FFFFFF' }]}>
           {item.categoria}
         </Text>
       </View>
+
       <View style={styles.gastoInfo}>
         {item.descripcion ? (
           <Text style={[styles.descripcion, { color: theme.colors.text }]} numberOfLines={1}>
@@ -51,6 +56,7 @@ function GastoItem({ item, onEliminar }) {
         ) : null}
         <Text style={styles.fechaText}>{fechaStr}</Text>
       </View>
+
       <Text style={[styles.montoText, { color: theme.colors.text }]}>
         ${item.monto.toLocaleString('es-UY')}
       </Text>
@@ -59,8 +65,9 @@ function GastoItem({ item, onEliminar }) {
 }
 
 export default function HomeScreen({ navigation }) {
-  const { gastosDelMes, totalMes, eliminarGasto } = useGastos();
-  const { theme, accentColor } = useTheme(); // 2. Obtener tema y color de acento
+  // 1. Obtenemos 'categorias' del hook para poder pasarlas a la lista
+  const { gastosDelMes, totalMes, eliminarGasto, categorias } = useGastos();
+  const { theme, accentColor } = useTheme();
 
   const mesActual = new Date().toLocaleDateString('es-UY', {
     month: 'long',
@@ -80,7 +87,7 @@ export default function HomeScreen({ navigation }) {
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <AppHeader />
 
-      {/* La tarjeta de resumen ahora usa el accentColor elegido */}
+      {/* Resumen Card con accentColor dinámico */}
       <View style={[styles.resumenCard, { backgroundColor: accentColor, shadowColor: accentColor }]}>
         <Text style={styles.resumenLabel}>
           Total {mesActual.charAt(0).toUpperCase() + mesActual.slice(1)}
@@ -93,7 +100,6 @@ export default function HomeScreen({ navigation }) {
         </Text>
       </View>
 
-      {/* Lista de gastos */}
       <View style={styles.listContainer}>
         <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Últimos Gastos</Text>
 
@@ -101,7 +107,11 @@ export default function HomeScreen({ navigation }) {
           data={gastosDelMes}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
-            <GastoItem item={item} onEliminar={eliminarGasto} />
+            <GastoItem
+              item={item}
+              onEliminar={eliminarGasto}
+              categorias={categorias} // Enviamos la lista de categorías aquí
+            />
           )}
           ListEmptyComponent={renderEmpty}
           contentContainerStyle={
@@ -111,7 +121,6 @@ export default function HomeScreen({ navigation }) {
         />
       </View>
 
-      {/* El FAB también usa el accentColor */}
       <TouchableOpacity
         style={[styles.fab, { backgroundColor: accentColor, shadowColor: accentColor }]}
         onPress={() => navigation.navigate('NuevoGasto')}

@@ -1,15 +1,25 @@
 import React, { useState } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity,
-  Modal, Switch
+  View,  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Modal,
+  Switch,
+  Alert
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../context/ThemeContext';
 import AppHeader from '../components/AppHeader';
 import ColorPicker from 'react-native-wheel-color-picker';
 
-export default function OpcionesScreen() {
+// Importamos useGastos para las acciones de borrado
+import { useGastos } from '../hooks/useGastos';
+
+export default function OpcionesScreen({ navigation }) {
   const { isDarkMode, setIsDarkMode, accentColor, setAccentColor, theme } = useTheme();
+  const { limpiarGastos, eliminarTodo } = useGastos(); // Asumiendo que existen en tu hook
+
   const [modalVisible, setModalVisible] = useState(false);
   const [tempColor, setTempColor] = useState(accentColor);
 
@@ -22,30 +32,100 @@ export default function OpcionesScreen() {
     setModalVisible(false);
   };
 
+  // Función para confirmar borrado de datos
+  const confirmarAccion = (tipo) => {
+    const esBorradoTotal = tipo === 'todo';
+    Alert.alert(
+      esBorradoTotal ? "Eliminar Todo" : "Reiniciar Montos",
+      esBorradoTotal
+        ? "¿Estás seguro de borrar todos los gastos y categorías? Esta acción es permanente."
+        : "¿Seguro que quieres poner todos los gastos en $0 manteniendo las categorías?",
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Confirmar",
+          style: "destructive",
+          onPress: () => esBorradoTotal ? eliminarTodo() : limpiarGastos()
+        }
+      ]
+    );
+  };
+
+  // Componente reutilizable para los botones de opción
+  const OptionButton = ({ icon, title, subtitle, onPress, isDestructive = false }) => (
+    <TouchableOpacity
+      style={[styles.optionItem, { backgroundColor: theme.colors.card }]}
+      onPress={onPress}
+      activeOpacity={0.7}
+    >
+      <View style={[styles.iconContainer, { backgroundColor: isDestructive ? '#FF444422' : accentColor + '22' }]}>
+        <MaterialCommunityIcons
+          name={icon}
+          size={24}
+          color={isDestructive ? '#FF4444' : accentColor}
+        />
+      </View>
+      <View style={styles.optionTextContainer}>
+        <Text style={[styles.optionTitle, { color: isDestructive ? '#FF4444' : theme.colors.text }]}>
+          {title}
+        </Text>
+        <Text style={styles.optionSubtitle}>{subtitle}</Text>
+      </View>
+      <MaterialCommunityIcons name="chevron-right" size={24} color="#CCC" />
+    </TouchableOpacity>
+  );
+
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <AppHeader />
 
       <ScrollView contentContainerStyle={styles.scroll}>
+
         <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Apariencia</Text>
 
-        <TouchableOpacity
-          style={[styles.optionItem, { backgroundColor: theme.colors.card }]}
+        <OptionButton
+          icon="palette"
+          title="Personalizar Tema"
+          subtitle="Modo oscuro y color de la app"
           onPress={() => {
             setTempColor(accentColor);
             setModalVisible(true);
           }}
-        >
-          <View style={styles.iconContainer}>
-            <MaterialCommunityIcons name="palette" size={24} color={accentColor} />
-          </View>
-          <View style={styles.optionTextContainer}>
-            <Text style={[styles.optionTitle, { color: theme.colors.text }]}>Personalizar Tema</Text>
-            <Text style={styles.optionSubtitle}>Selector de color avanzado</Text>
-          </View>
-          <View style={[styles.colorPreview, { backgroundColor: accentColor }]} />
-          <MaterialCommunityIcons name="chevron-right" size={24} color="#CCC" />
-        </TouchableOpacity>
+        />
+
+        <OptionButton
+          icon="tag-multiple"
+          title="Gestionar Categorías"
+          subtitle="Añadir o eliminar categorías y sus colores"
+          onPress={() => navigation.navigate('Home', { screen: 'GestionCategoriasScreen' })}
+        />
+
+        <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Datos y Cuenta</Text>
+
+        <OptionButton
+          icon="file-pdf-box"
+          title="Exportar Reporte"
+          subtitle="Enviar datos en PDF o JSON por mail"
+          onPress={() => Alert.alert("Próximamente", "Esta función estará disponible en la siguiente actualización.")}
+        />
+
+        <Text style={[styles.sectionTitle, { color: '#FF4444' }]}>Zona de Peligro</Text>
+
+        <OptionButton
+          icon="refresh"
+          title="Reiniciar montos a $0"
+          subtitle="Limpiar gastos del mes actual"
+          onPress={() => confirmarAccion('limpiar')}
+          isDestructive
+        />
+
+        <OptionButton
+          icon="trash-can"
+          title="Borrar todos los datos"
+          subtitle="Eliminar gastos e historial completo"
+          onPress={() => confirmarAccion('todo')}
+          isDestructive
+        />
 
         {/* --- MODAL DE PERSONALIZACIÓN --- */}
         <Modal
@@ -58,7 +138,6 @@ export default function OpcionesScreen() {
             <View style={[styles.modalContent, { backgroundColor: theme.colors.card }]}>
               <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Personalizar</Text>
 
-              {/* SECCIÓN DEL SWITCH DELIMITADA */}
               <View style={[
                 styles.darkModeBox,
                 { backgroundColor: theme.dark ? '#2A2A2A' : '#F0F0F0' }
@@ -81,10 +160,8 @@ export default function OpcionesScreen() {
                 </View>
               </View>
 
-              {/* Etiqueta para el Color Picker */}
               <Text style={[styles.pickerLabel, { color: theme.colors.text }]}>Color de énfasis</Text>
 
-              {/* COLOR PICKER AVANZADO */}
               <View style={styles.pickerContainer}>
                 <ColorPicker
                   color={tempColor}
@@ -114,6 +191,7 @@ export default function OpcionesScreen() {
             </View>
           </View>
         </Modal>
+
       </ScrollView>
     </View>
   );
@@ -121,21 +199,44 @@ export default function OpcionesScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  scroll: { padding: 20 },
-  sectionTitle: { fontSize: 14, fontWeight: '700', marginBottom: 10, marginTop: 20 },
-  optionItem: { flexDirection: 'row', alignItems: 'center', padding: 15, borderRadius: 16, elevation: 2 },
-  iconContainer: { marginRight: 15 },
+  scroll: { padding: 20, paddingBottom: 40 },
+  sectionTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    marginBottom: 10,
+    marginTop: 25,
+    textTransform: 'uppercase',
+    opacity: 0.6
+  },
+  optionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 15,
+    borderRadius: 16,
+    marginBottom: 10,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 5
+  },
+  iconContainer: {
+    width: 45,
+    height: 45,
+    borderRadius: 12,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 15
+  },
   optionTextContainer: { flex: 1 },
   optionTitle: { fontSize: 16, fontWeight: '700' },
-  optionSubtitle: { fontSize: 12, color: '#888' },
-  colorPreview: { width: 20, height: 20, borderRadius: 10, marginRight: 10 },
+  optionSubtitle: { fontSize: 12, color: '#888', marginTop: 2 },
 
   // Modal Styles
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center' },
   modalContent: { width: '90%', height: 550, padding: 20, borderRadius: 25, elevation: 10 },
   modalTitle: { fontSize: 22, fontWeight: 'bold', marginBottom: 20, textAlign: 'center' },
 
-  // Nuevo estilo para delimitar el modo oscuro
   darkModeBox: {
     borderRadius: 15,
     paddingHorizontal: 15,

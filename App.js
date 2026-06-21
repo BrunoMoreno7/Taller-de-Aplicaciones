@@ -9,6 +9,7 @@ import HomeScreen from './src/screens/HomeScreen';
 import NuevoGastoScreen from './src/screens/NuevoGastoScreen';
 import EstadisticasScreen from './src/screens/EstadisticasScreen';
 import OpcionesScreen from './src/screens/OpcionesScreen';
+import GestionCategoriasScreen from './src/screens/GestionCategoriasScreen';
 
 // Tema y Contexto
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
@@ -21,6 +22,7 @@ function TabIcon({ name, focused }) {
     Home: '🏠',
     Estadisticas: '📊',
     Opciones: '⚙️',
+    GestionCategoriasScreen: '🏷️',
   };
 
   return (
@@ -40,6 +42,7 @@ function HomeStack() {
         options={{ animation: 'slide_from_bottom' }}
       />
       <Stack.Screen name="Opciones" component={OpcionesScreen} />
+      <Stack.Screen name="GestionCategoriasScreen" component={GestionCategoriasScreen} />
     </Stack.Navigator>
   );
 }
