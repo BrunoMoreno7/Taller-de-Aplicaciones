@@ -16,6 +16,7 @@ import {
 import AppHeader from '../components/AppHeader';
 import { COLORS, CATEGORY_LIST } from '../constants/theme';
 import { useGastos } from '../hooks/useGastos';
+import { useTheme } from '../context/ThemeContext'; // 1. Importar el hook
 
 export default function NuevoGastoScreen({ navigation }) {
   const [monto, setMonto] = useState('');
@@ -25,9 +26,9 @@ export default function NuevoGastoScreen({ navigation }) {
   const [guardando, setGuardando] = useState(false);
 
   const { agregarGasto } = useGastos();
+  const { theme, accentColor } = useTheme(); // 2. Obtener tema y color de acento
 
   const handleGuardar = async () => {
-    // Validaciones
     if (!monto.trim()) {
       Alert.alert('Campo requerido', 'Ingresá el monto del gasto.');
       return;
@@ -57,9 +58,16 @@ export default function NuevoGastoScreen({ navigation }) {
     ? COLORS.categories[categoria] || COLORS.categories['Otro']
     : null;
 
+  // Estilo dinámico para los inputs basado en el tema
+  const inputThemeStyle = {
+    backgroundColor: theme.colors.card,
+    borderColor: theme.dark ? '#333' : '#EEE',
+    color: theme.colors.text
+  };
+
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      style={[styles.container, { backgroundColor: theme.colors.background }]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <AppHeader />
@@ -69,17 +77,17 @@ export default function NuevoGastoScreen({ navigation }) {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <Text style={styles.pageTitle}>Nuevo Gasto</Text>
+        <Text style={[styles.pageTitle, { color: theme.colors.text }]}>Nuevo Gasto</Text>
 
         {/* MONTO */}
         <View style={styles.fieldGroup}>
-          <Text style={styles.label}>Monto</Text>
-          <View style={styles.inputWrapper}>
-            <Text style={styles.currencySymbol}>$</Text>
+          <Text style={[styles.label, { color: theme.colors.text }]}>Monto</Text>
+          <View style={[styles.inputWrapper, inputThemeStyle]}>
+            <Text style={[styles.currencySymbol, { color: theme.colors.text }]}>$</Text>
             <TextInput
-              style={styles.montoInput}
+              style={[styles.montoInput, { color: theme.colors.text }]}
               placeholder="0"
-              placeholderTextColor={COLORS.textMuted}
+              placeholderTextColor={theme.dark ? '#666' : '#AAA'}
               value={monto}
               onChangeText={setMonto}
               keyboardType="numeric"
@@ -90,11 +98,12 @@ export default function NuevoGastoScreen({ navigation }) {
 
         {/* CATEGORÍA */}
         <View style={styles.fieldGroup}>
-          <Text style={styles.label}>Categoría</Text>
+          <Text style={[styles.label, { color: theme.colors.text }]}>Categoría</Text>
           <TouchableOpacity
             style={[
               styles.selectButton,
-              coloresCategoria && { backgroundColor: coloresCategoria.bg },
+              inputThemeStyle,
+              coloresCategoria && { backgroundColor: coloresCategoria.bg, borderColor: coloresCategoria.bg },
             ]}
             onPress={() => setModalVisible(true)}
             activeOpacity={0.8}
@@ -102,6 +111,7 @@ export default function NuevoGastoScreen({ navigation }) {
             <Text
               style={[
                 styles.selectText,
+                { color: theme.dark ? '#AAA' : '#888' },
                 coloresCategoria && { color: coloresCategoria.text, fontWeight: '700' },
               ]}
             >
@@ -115,14 +125,14 @@ export default function NuevoGastoScreen({ navigation }) {
 
         {/* DESCRIPCIÓN */}
         <View style={styles.fieldGroup}>
-          <Text style={styles.label}>
+          <Text style={[styles.label, { color: theme.colors.text }]}>
             Descripción{' '}
             <Text style={styles.opcional}>(Opcional)</Text>
           </Text>
           <TextInput
-            style={[styles.inputBase, styles.textArea]}
+            style={[styles.inputBase, inputThemeStyle, styles.textArea]}
             placeholder="Ingresar Descripcion"
-            placeholderTextColor={COLORS.textMuted}
+            placeholderTextColor={theme.dark ? '#666' : '#AAA'}
             value={descripcion}
             onChangeText={setDescripcion}
             multiline
@@ -133,13 +143,17 @@ export default function NuevoGastoScreen({ navigation }) {
 
         {/* BOTÓN GUARDAR */}
         <TouchableOpacity
-          style={[styles.guardarBtn, guardando && styles.guardarBtnDisabled]}
+          style={[
+            styles.guardarBtn,
+            { backgroundColor: accentColor, shadowColor: accentColor }, // Color dinámico
+            guardando && styles.guardarBtnDisabled
+          ]}
           onPress={handleGuardar}
           activeOpacity={0.85}
           disabled={guardando}
         >
           {guardando ? (
-            <ActivityIndicator color={COLORS.white} />
+            <ActivityIndicator color="#FFF" />
           ) : (
             <Text style={styles.guardarText}>Guardar</Text>
           )}
@@ -158,9 +172,9 @@ export default function NuevoGastoScreen({ navigation }) {
           activeOpacity={1}
           onPress={() => setModalVisible(false)}
         >
-          <View style={styles.modalSheet}>
+          <View style={[styles.modalSheet, { backgroundColor: theme.colors.card }]}>
             <View style={styles.modalHandle} />
-            <Text style={styles.modalTitle}>Elegir categoría</Text>
+            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Elegir categoría</Text>
             <FlatList
               data={CATEGORY_LIST}
               keyExtractor={(item) => item}
@@ -172,7 +186,7 @@ export default function NuevoGastoScreen({ navigation }) {
                     style={[
                       styles.categoriaOption,
                       { backgroundColor: col.bg },
-                      seleccionada && styles.categoriaSeleccionada,
+                      seleccionada && { borderWidth: 2, borderColor: theme.colors.text },
                     ]}
                     onPress={() => {
                       setCategoria(item);
@@ -201,7 +215,6 @@ export default function NuevoGastoScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
   },
   scroll: {
     padding: 20,
@@ -211,7 +224,6 @@ const styles = StyleSheet.create({
     fontSize: 32,
     fontWeight: '900',
     fontStyle: 'italic',
-    color: COLORS.text,
     marginBottom: 28,
     letterSpacing: -1,
   },
@@ -221,99 +233,82 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 16,
     fontWeight: '700',
-    color: COLORS.text,
     marginBottom: 8,
   },
   opcional: {
     fontWeight: '400',
-    color: COLORS.textMuted,
+    color: '#888',
     fontSize: 14,
   },
   inputBase: {
-    borderWidth: 2,
-    borderColor: COLORS.border,
-    borderRadius: 8,
+    borderWidth: 1.5,
+    borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 12,
     fontSize: 16,
-    color: COLORS.text,
-    backgroundColor: COLORS.white,
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 2,
-    borderColor: COLORS.border,
-    borderRadius: 8,
-    backgroundColor: COLORS.white,
+    borderWidth: 1.5,
+    borderRadius: 12,
     paddingHorizontal: 14,
   },
   currencySymbol: {
     fontSize: 22,
     fontWeight: '700',
-    color: COLORS.text,
     marginRight: 4,
   },
   montoInput: {
     flex: 1,
     fontSize: 28,
     fontWeight: '800',
-    color: COLORS.text,
     paddingVertical: 12,
   },
   selectButton: {
-    borderWidth: 2,
-    borderColor: COLORS.border,
-    borderRadius: 8,
+    borderWidth: 1.5,
+    borderRadius: 12,
     paddingHorizontal: 14,
     paddingVertical: 14,
-    backgroundColor: COLORS.white,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
   selectText: {
     fontSize: 16,
-    color: COLORS.textMuted,
   },
   chevron: {
     fontSize: 18,
-    color: COLORS.textMuted,
   },
   textArea: {
     height: 90,
     paddingTop: 12,
   },
   guardarBtn: {
-    backgroundColor: COLORS.primary,
     borderRadius: 50,
     paddingVertical: 18,
     alignItems: 'center',
     marginTop: 12,
     elevation: 3,
-    shadowColor: COLORS.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
   },
   guardarBtnDisabled: {
-    opacity: 0.7,
+    opacity: 0.5,
   },
   guardarText: {
-    color: COLORS.white,
+    color: '#FFFFFF',
     fontSize: 18,
     fontWeight: '800',
     letterSpacing: 0.5,
   },
-
-  // Modal
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: 'rgba(0,0,0,0.6)',
     justifyContent: 'flex-end',
   },
   modalSheet: {
-    backgroundColor: COLORS.white,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 20,
@@ -323,7 +318,7 @@ const styles = StyleSheet.create({
   modalHandle: {
     width: 40,
     height: 4,
-    backgroundColor: COLORS.textMuted,
+    backgroundColor: '#888',
     borderRadius: 2,
     alignSelf: 'center',
     marginBottom: 16,
@@ -331,7 +326,6 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 18,
     fontWeight: '800',
-    color: COLORS.text,
     marginBottom: 14,
     textAlign: 'center',
   },
@@ -343,10 +337,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-  },
-  categoriaSeleccionada: {
-    borderWidth: 2,
-    borderColor: COLORS.text,
   },
   categoriaOptionText: {
     fontSize: 16,

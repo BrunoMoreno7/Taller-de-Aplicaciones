@@ -8,7 +8,7 @@ export default function AppHeader() {
   return (
     <SafeAreaView style={{ backgroundColor: accentColor }}>
       <View style={[styles.header, { backgroundColor: accentColor }]}>
-        <Text style={styles.title}>Money's Gone</Text>
+        <Text style={styles.title}>Money's Gone 😞</Text>
       </View>
     </SafeAreaView>
   );
