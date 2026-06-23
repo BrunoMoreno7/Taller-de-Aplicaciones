@@ -16,13 +16,14 @@ import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
+const OpcionesStack = createNativeStackNavigator(); // Stack adicional para Ajustes
 
+// Iconos de la barra inferior
 function TabIcon({ name, focused }) {
   const icons = {
     Home: '🏠',
     Estadisticas: '📊',
-    Opciones: '⚙️',
-    GestionCategoriasScreen: '🏷️',
+    OpcionesTab: '⚙️', // Nombre de la pestaña de Ajustes
   };
 
   return (
@@ -32,6 +33,7 @@ function TabIcon({ name, focused }) {
   );
 }
 
+// Stack para la pestaña de Inicio
 function HomeStack() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
@@ -41,9 +43,18 @@ function HomeStack() {
         component={NuevoGastoScreen}
         options={{ animation: 'slide_from_bottom' }}
       />
-      <Stack.Screen name="Opciones" component={OpcionesScreen} />
-      <Stack.Screen name="GestionCategoriasScreen" component={GestionCategoriasScreen} />
     </Stack.Navigator>
+  );
+}
+
+// Stack para la pestaña de Ajustes (NUEVO)
+// Esto permite que GestionCategoriasScreen pertenezca a Ajustes
+function OpcionesStackScreen() {
+  return (
+    <OpcionesStack.Navigator screenOptions={{ headerShown: false }}>
+      <OpcionesStack.Screen name="OpcionesMain" component={OpcionesScreen} />
+      <OpcionesStack.Screen name="GestionCategoriasScreen" component={GestionCategoriasScreen} />
+    </OpcionesStack.Navigator>
   );
 }
 
@@ -58,11 +69,10 @@ function AppContent() {
           tabBarIcon: ({ focused }) => (
             <TabIcon name={route.name} focused={focused} />
           ),
-          // Cuando la barra es de color, los iconos activos suelen ser blancos
           tabBarActiveTintColor: '#FFFFFF',
           tabBarInactiveTintColor: 'rgba(255, 255, 255, 0.5)',
           tabBarStyle: {
-            backgroundColor: accentColor, // <--- AQUÍ CAMBIA EL COLOR DE LA BARRA INFERIOR
+            backgroundColor: accentColor,
             borderTopWidth: 0,
             height: Platform.OS === 'ios' ? 80 : 65,
             paddingBottom: Platform.OS === 'ios' ? 20 : 10,
@@ -86,8 +96,8 @@ function AppContent() {
           options={{ tabBarLabel: 'Estadísticas' }}
         />
         <Tab.Screen
-          name="Opciones"
-          component={OpcionesScreen}
+          name="OpcionesTab" // Cambiamos el nombre para evitar conflictos con el Stack
+          component={OpcionesStackScreen} // Usamos el nuevo Stack de Ajustes
           options={{ tabBarLabel: 'Ajustes' }}
         />
       </Tab.Navigator>

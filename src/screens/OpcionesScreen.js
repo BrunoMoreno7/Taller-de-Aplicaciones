@@ -97,7 +97,7 @@ export default function OpcionesScreen({ navigation }) {
           icon="tag-multiple"
           title="Gestionar Categorías"
           subtitle="Añadir o eliminar categorías y sus colores"
-          onPress={() => navigation.navigate('Home', { screen: 'GestionCategoriasScreen' })}
+          onPress={() => navigation.navigate('GestionCategoriasScreen')}
         />
 
         <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Datos y Cuenta</Text>
@@ -106,7 +106,7 @@ export default function OpcionesScreen({ navigation }) {
           icon="file-pdf-box"
           title="Exportar Reporte"
           subtitle="Enviar datos en PDF o JSON por mail"
-          onPress={() => Alert.alert("Próximamente", "Esta función estará disponible en la siguiente actualización.")}
+          onPress={() => Alert.alert("Próximamente", "Esta función estará disponible en la siguiente actualización きっとmaybe.")}
         />
 
         <Text style={[styles.sectionTitle, { color: '#FF4444' }]}>Zona de Peligro</Text>

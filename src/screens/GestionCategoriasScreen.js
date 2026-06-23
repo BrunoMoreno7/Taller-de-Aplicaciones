@@ -13,9 +13,11 @@ export default function GestionCategoriasScreen() {
   const { theme, accentColor } = useTheme();
   const { categorias, agregarCategoria, eliminarCategoria, editarCategoria } = useGastos();
 
-  // Estados para el Modal de Edición/Creación
   const [modalVisible, setModalVisible] = useState(false);
-  const [editandoId, setEditandoId] = useState(null); // null = creando, id = editando
+  const [confirmModalVisible, setConfirmModalVisible] = useState(false); // Nuevo modal
+  const [catParaBorrar, setCatParaBorrar] = useState(null); // Guardar qué vamos a borrar
+
+  const [editandoId, setEditandoId] = useState(null);
   const [nombre, setNombre] = useState('');
   const [tempColor, setTempColor] = useState(accentColor);
 
@@ -34,13 +36,26 @@ export default function GestionCategoriasScreen() {
 
   const handleGuardar = () => {
     if (!nombre.trim()) return;
-
     if (editandoId) {
       editarCategoria(editandoId, { nombre: nombre.trim(), color: tempColor });
     } else {
       agregarCategoria({ nombre: nombre.trim(), color: tempColor });
     }
     setModalVisible(false);
+  };
+
+  // Función para preparar la eliminación
+  const solicitarEliminar = (cat) => {
+    setCatParaBorrar(cat);
+    setConfirmModalVisible(true);
+  };
+
+  const ejecutarEliminacion = () => {
+    if (catParaBorrar) {
+      eliminarCategoria(catParaBorrar.id);
+      setConfirmModalVisible(false);
+      setCatParaBorrar(null);
+    }
   };
 
   return (
@@ -68,9 +83,11 @@ export default function GestionCategoriasScreen() {
             >
               <View style={[styles.colorDot, { backgroundColor: item.color }]} />
               <Text style={[styles.catName, { color: theme.colors.text }]}>{item.nombre}</Text>
-              <TouchableOpacity onPress={() => eliminarCategoria(item.id)}>
+
+              <TouchableOpacity onPress={() => solicitarEliminar(item)}>
                 <MaterialCommunityIcons name="trash-can-outline" size={22} color="#FF4444" />
               </TouchableOpacity>
+
               <MaterialCommunityIcons name="chevron-right" size={20} color="#CCC" />
             </TouchableOpacity>
           )}
@@ -84,7 +101,6 @@ export default function GestionCategoriasScreen() {
             <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
                 {editandoId ? 'Editar Categoría' : 'Nueva Categoría'}
             </Text>
-
             <TextInput
               style={[styles.input, { backgroundColor: theme.dark ? '#2A2A2A' : '#F5F5F5', color: theme.colors.text }]}
               placeholder="Nombre de la categoría"
@@ -92,9 +108,7 @@ export default function GestionCategoriasScreen() {
               value={nombre}
               onChangeText={setNombre}
             />
-
             <Text style={[styles.label, { color: theme.colors.text }]}>Color de categoría</Text>
-
             <View style={styles.pickerContainer}>
                 <ColorPicker
                     color={tempColor}
@@ -105,13 +119,33 @@ export default function GestionCategoriasScreen() {
                     row={false}
                 />
             </View>
-
             <View style={styles.buttonRow}>
               <TouchableOpacity style={styles.cancelBtn} onPress={() => setModalVisible(false)}>
                 <Text style={styles.cancelBtnText}>Cancelar</Text>
               </TouchableOpacity>
               <TouchableOpacity style={[styles.saveBtn, { backgroundColor: accentColor }]} onPress={handleGuardar}>
                 <Text style={styles.saveBtnText}>Guardar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* NUEVO MODAL DE CONFIRMACIÓN (PARA WEB Y MÓVIL) */}
+      <Modal visible={confirmModalVisible} animationType="fade" transparent>
+        <View style={styles.modalOverlay}>
+          <View style={[styles.confirmContent, { backgroundColor: theme.colors.card }]}>
+            <MaterialCommunityIcons name="alert-circle-outline" size={50} color="#FF4444" style={{ alignSelf: 'center', marginBottom: 15 }} />
+            <Text style={[styles.modalTitle, { color: theme.colors.text }]}>¿Deseas continuar?</Text>
+            <Text style={{ color: theme.colors.text, textAlign: 'center', marginBottom: 25, fontSize: 16 }}>
+              Se borrará la categoría <Text style={{fontWeight: 'bold'}}>"{catParaBorrar?.nombre}"</Text>
+            </Text>
+            <View style={styles.buttonRow}>
+              <TouchableOpacity style={styles.cancelBtn} onPress={() => setConfirmModalVisible(false)}>
+                <Text style={styles.cancelBtnText}>No</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.saveBtn, { backgroundColor: '#FF4444' }]} onPress={ejecutarEliminacion}>
+                <Text style={styles.saveBtnText}>Sí, borrar</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -130,10 +164,10 @@ const styles = StyleSheet.create({
   catItem: { flexDirection: 'row', alignItems: 'center', padding: 15, borderRadius: 15, marginBottom: 10, elevation: 1 },
   colorDot: { width: 16, height: 16, borderRadius: 8, marginRight: 15 },
   catName: { flex: 1, fontSize: 16, fontWeight: '600' },
-
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center' },
   modalContent: { width: '90%', height: 550, padding: 25, borderRadius: 25 },
-  modalTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 20, textAlign: 'center' },
+  confirmContent: { width: '85%', padding: 25, borderRadius: 20, elevation: 10 }, // Estilo para el modal de borrado
+  modalTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 10, textAlign: 'center' },
   input: { borderRadius: 12, padding: 15, fontSize: 16, marginBottom: 20 },
   label: { fontSize: 14, fontWeight: '700', marginBottom: 10, opacity: 0.6, textTransform: 'uppercase' },
   pickerContainer: { flex: 1, marginBottom: 20 },
