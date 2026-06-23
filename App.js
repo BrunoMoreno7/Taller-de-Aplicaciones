@@ -13,23 +13,28 @@ import GestionCategoriasScreen from './src/screens/GestionCategoriasScreen';
 
 // Tema y Contexto
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
+import { MaterialCommunityIcons } from '@expo/vector-icons'; // para los íconos
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 const OpcionesStack = createNativeStackNavigator(); // Stack adicional para Ajustes
 
 // Iconos de la barra inferior
-function TabIcon({ name, focused }) {
+function TabIcon({ name, focused, color }) {
   const icons = {
-    Home: '🏠',
-    Estadisticas: '📊',
-    OpcionesTab: '⚙️', // Nombre de la pestaña de Ajustes
+    Home: focused ? 'home' : 'home-outline',
+    Estadisticas: focused ? 'chart-arc' : 'chart-pie',
+    OpcionesTab: focused ? 'cog' : 'cog-outline',
   };
 
+  const iconName = icons[name] || 'help-circle';
+
   return (
-    <Text style={{ fontSize: 22, opacity: focused ? 1 : 0.5 }}>
-      {icons[name] || '❓'}
-    </Text>
+    <MaterialCommunityIcons
+      name={iconName}
+      size={26}
+      color={color}
+    />
   );
 }
 
@@ -66,8 +71,8 @@ function AppContent() {
       <Tab.Navigator
         screenOptions={({ route }) => ({
           headerShown: false,
-          tabBarIcon: ({ focused }) => (
-            <TabIcon name={route.name} focused={focused} />
+          tabBarIcon: ({ focused, color }) => ( // Añadimos 'color' aquí
+            <TabIcon name={route.name} focused={focused} color={color} /> // Y lo pasamos aquí
           ),
           tabBarActiveTintColor: '#FFFFFF',
           tabBarInactiveTintColor: 'rgba(255, 255, 255, 0.5)',
