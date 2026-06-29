@@ -8,6 +8,7 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AppHeader from '../components/AppHeader';
 import { useGastos } from '../hooks/useGastos';
 import { useTheme } from '../context/ThemeContext';

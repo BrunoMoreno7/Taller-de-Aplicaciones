@@ -6,9 +6,11 @@ import {
   TouchableOpacity,
   Modal,
   Switch,
-  Alert
+  Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
 import AppHeader from '../components/AppHeader';
 import ColorPicker from 'react-native-wheel-color-picker';
@@ -18,10 +20,12 @@ import { useGastos } from '../hooks/useGastos';
 
 export default function OpcionesScreen({ navigation }) {
   const { isDarkMode, setIsDarkMode, accentColor, setAccentColor, theme } = useTheme();
-  const { limpiarGastos, eliminarTodo } = useGastos(); // Asumiendo que existen en tu hook
+  const { limpiarGastos, eliminarTodo, exportarDatos, importarDatos } = useGastos();
 
   const [modalVisible, setModalVisible] = useState(false);
   const [tempColor, setTempColor] = useState(accentColor);
+  const [procesando, setProcesando] = useState(false);
+  const insets = useSafeAreaInsets();
 
   const handleColorChange = (color) => {
     setTempColor(color);
@@ -30,6 +34,59 @@ export default function OpcionesScreen({ navigation }) {
   const saveColor = () => {
     setAccentColor(tempColor);
     setModalVisible(false);
+  };
+
+  // Exportar todos los gastos y categorías a un archivo .json y compartirlo
+  const handleExportar = async () => {
+    if (procesando) return;
+    setProcesando(true);
+    const resultado = await exportarDatos();
+    setProcesando(false);
+
+    if (!resultado.ok) {
+      Alert.alert('Error al exportar', resultado.error || 'No se pudo generar el archivo.');
+      return;
+    }
+    Alert.alert('Exportación lista', `Se exportaron ${resultado.totalGastos} gastos en formato JSON.`);
+  };
+
+  // Importar gastos/categorías desde un archivo .json elegido por el usuario
+  const handleImportar = () => {
+    if (procesando) return;
+    Alert.alert(
+      'Importar Datos',
+      '¿Cómo querés importar el archivo JSON?',
+      [
+        { text: 'Cancelar', style: 'cancel' },
+        {
+          text: 'Combinar',
+          onPress: () => ejecutarImportacion('combinar'),
+        },
+        {
+          text: 'Reemplazar todo',
+          style: 'destructive',
+          onPress: () => ejecutarImportacion('reemplazar'),
+        },
+      ],
+    );
+  };
+
+  const ejecutarImportacion = async (modo) => {
+    setProcesando(true);
+    const resultado = await importarDatos({ modo });
+    setProcesando(false);
+
+    if (resultado.cancelado) return;
+
+    if (!resultado.ok) {
+      Alert.alert('Error al importar', resultado.error || 'No se pudo leer el archivo.');
+      return;
+    }
+
+    Alert.alert(
+      'Importación completa',
+      `Se importaron ${resultado.totalGastos} gastos y ${resultado.totalCategorias} categorías.`,
+    );
   };
 
   // Función para confirmar borrado de datos
@@ -105,16 +162,23 @@ export default function OpcionesScreen({ navigation }) {
         <OptionButton
           icon="upload"
           title="Exportar Reporte"
-          subtitle="Enviar datos en PDF o JSON"
-          onPress={() => Alert.alert("Próximamente", "Esta función estará disponible en la siguiente actualización きっとmaybe.")}
+          subtitle="Guardar o compartir tus datos en JSON"
+          onPress={handleExportar}
         />
 
         <OptionButton
-        icon="download"
-        title="Importar Datos"
-        subtitle="Importar gastos desde JSON"
-        onPress={()=> Alert.alert("Ahora lo hago")}
+          icon="download"
+          title="Importar Datos"
+          subtitle="Cargar gastos y categorías desde un JSON"
+          onPress={handleImportar}
         />
+
+        {procesando && (
+          <View style={styles.procesandoBox}>
+            <ActivityIndicator color={accentColor} />
+            <Text style={[styles.procesandoText, { color: theme.colors.text }]}>Procesando…</Text>
+          </View>
+        )}
 
         <Text style={[styles.sectionTitle, { color: '#FF4444' }]}>Zona de Peligro</Text>
 
@@ -238,6 +302,15 @@ const styles = StyleSheet.create({
   optionTextContainer: { flex: 1 },
   optionTitle: { fontSize: 16, fontWeight: '700' },
   optionSubtitle: { fontSize: 12, color: '#888', marginTop: 2 },
+
+  procesandoBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    marginBottom: 5,
+  },
+  procesandoText: { marginLeft: 10, fontSize: 13, opacity: 0.7 },
 
   // Modal Styles
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center' },

@@ -7,6 +7,9 @@ import {
   TouchableOpacity,
   Alert,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import * as Print from 'expo-print';
+import * as Sharing from 'expo-sharing';
 import { PieChart } from 'react-native-gifted-charts';
 import AppHeader from '../components/AppHeader';
 import { useGastos } from '../hooks/useGastos';
@@ -16,6 +19,7 @@ export default function EstadisticasScreen() {
   // 1. Obtenemos 'categorias' (dinámicas) del hook
   const { porCategoria, categorias } = useGastos();
   const { theme, accentColor } = useTheme();
+  const insets = useSafeAreaInsets();
 
   const mesActual = new Date().toLocaleString('es-UY', { month: 'long' });
 
@@ -47,15 +51,81 @@ export default function EstadisticasScreen() {
 
   const pieData = chartData.map(({ value, color, text }) => ({ value, color, text }));
 
-  const handleExportarPDF = () => {
-    Alert.alert('Exportar PDF', 'Funcionalidad próximamente.', [{ text: 'OK' }]);
+  const handleExportarPDF = async () => {
+    try {
+      const tituloMes = `${mesActual.charAt(0).toUpperCase() + mesActual.slice(1)} ${new Date().getFullYear()}`;
+
+      const filasHtml = chartData
+        .map(({ categoria, monto, color }) => {
+          const porcentaje = totalCalculado > 0 ? ((monto / totalCalculado) * 100).toFixed(1) : '0.0';
+          return `
+            <tr>
+              <td>
+                <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${color};margin-right:8px;"></span>
+                ${categoria}
+              </td>
+              <td style="text-align:right;">${porcentaje}%</td>
+              <td style="text-align:right;">$${monto.toLocaleString('es-UY')}</td>
+            </tr>`;
+        })
+        .join('');
+
+      const html = `
+        <html>
+          <head>
+            <meta charset="utf-8" />
+            <style>
+              body { font-family: -apple-system, Helvetica, Arial, sans-serif; padding: 28px; color: #222; }
+              h1 { font-size: 20px; margin-bottom: 2px; }
+              .subtitle { color: #888; font-size: 13px; margin-bottom: 24px; }
+              table { width: 100%; border-collapse: collapse; }
+              th { text-align: left; font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; padding-bottom: 8px; border-bottom: 1px solid #eee; }
+              td { padding: 10px 0; border-bottom: 1px solid #f2f2f2; font-size: 14px; }
+              .total-row td { font-weight: bold; font-size: 16px; border-top: 2px solid #333; border-bottom: none; padding-top: 14px; }
+            </style>
+          </head>
+          <body>
+            <h1>Reporte de Gastos</h1>
+            <div class="subtitle">${tituloMes}</div>
+            <table>
+              <thead>
+                <tr><th>Categoría</th><th style="text-align:right;">%</th><th style="text-align:right;">Monto</th></tr>
+              </thead>
+              <tbody>
+                ${filasHtml || '<tr><td colspan="3" style="color:#888;">Sin gastos registrados este mes.</td></tr>'}
+                <tr class="total-row"><td>Total</td><td></td><td style="text-align:right;">$${totalCalculado.toLocaleString('es-UY')}</td></tr>
+              </tbody>
+            </table>
+          </body>
+        </html>
+      `;
+
+      const { uri } = await Print.printToFileAsync({ html });
+
+      const puedeCompartir = await Sharing.isAvailableAsync();
+      if (puedeCompartir) {
+        await Sharing.shareAsync(uri, {
+          mimeType: 'application/pdf',
+          dialogTitle: 'Exportar reporte de gastos',
+          UTI: 'com.adobe.pdf',
+        });
+      } else {
+        Alert.alert('PDF generado', 'No se pudo abrir el diálogo para compartir, pero el archivo se generó correctamente.');
+      }
+    } catch (e) {
+      console.error('[EstadisticasScreen] Error al exportar PDF:', e);
+      Alert.alert('Error', 'No se pudo generar el PDF.');
+    }
   };
 
   return (
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <AppHeader />
 
-      <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.topRow}>
           <Text style={[styles.pageTitle, { color: theme.colors.text }]}>
             {mesActual.charAt(0).toUpperCase() + mesActual.slice(1)}

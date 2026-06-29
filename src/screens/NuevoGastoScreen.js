@@ -12,6 +12,7 @@ import {  View,
   Platform,
   ActivityIndicator,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AppHeader from '../components/AppHeader';
 import { useGastos } from '../hooks/useGastos';
 import { useTheme } from '../context/ThemeContext';
@@ -22,6 +23,7 @@ export default function NuevoGastoScreen({ navigation }) {
   const [descripcion, setDescripcion] = useState('');
   const [modalVisible, setModalVisible] = useState(false);
   const [guardando, setGuardando] = useState(false);
+  const insets = useSafeAreaInsets();
 
   // 1. Obtenemos las categorías dinámicas del hook
   const { agregarGasto, categorias } = useGastos();

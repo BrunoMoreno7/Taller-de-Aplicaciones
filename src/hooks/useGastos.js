@@ -1,18 +1,20 @@
 import { useCallback, useEffect, useSyncExternalStore } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as FileSystem from 'expo-file-system/legacy';
+import * as Sharing from 'expo-sharing';
+import * as DocumentPicker from 'expo-document-picker';
 
-// ─── Claves de AsyncStorage ───────────────────────────────────────────────────
+const VERSION_EXPORT = 1;
+
 const STORAGE_KEY_GASTOS = '@gastos_app:gastos';
 const STORAGE_KEY_CATEGORIAS = '@gastos_app:categorias';
 
-// ─── Categorías por defecto ───────────────────────────────────────────────────
 const CATEGORIAS_INICIALES = [
   { id: '1', nombre: 'Comida',      color: '#FF9800' },
   { id: '2', nombre: 'Transporte',  color: '#007AFF' },
   { id: '3', nombre: 'Salud',       color: '#4CAF50' },
 ];
 
-// ─── Estado global en memoria ─────────────────────────────────────────────────
 let gastosEnMemoria = [];
 let categoriasEnMemoria = [...CATEGORIAS_INICIALES];
 let cargadoDesdeStorage = false;   // flag: la carga inicial ya ocurrió
@@ -43,9 +45,6 @@ function suscribirse(listener) {
   return () => listeners.delete(listener);
 }
 
-// ─── Persistencia ─────────────────────────────────────────────────────────────
-
-/** Guarda el estado actual en AsyncStorage como JSON */
 async function persistirDatos() {
   try {
     await AsyncStorage.multiSet([
@@ -57,7 +56,6 @@ async function persistirDatos() {
   }
 }
 
-/** Lee los datos guardados y los carga en memoria (solo se llama una vez) */
 async function cargarDatos() {
   try {
     const resultado = await AsyncStorage.multiGet([
@@ -83,10 +81,8 @@ async function cargarDatos() {
   }
 }
 
-// Arrancamos la carga una sola vez al importar el módulo
 cargarDatos();
 
-// ─── Hook ─────────────────────────────────────────────────────────────────────
 export function useGastos() {
   const { gastos, categorias, cargando } = useSyncExternalStore(
     suscribirse,
@@ -94,7 +90,6 @@ export function useGastos() {
     obtenerDatos,
   );
 
-  // ── Gastos ──────────────────────────────────────────────────────────────────
 
   const agregarGasto = useCallback(async ({ monto, categoria, descripcion }) => {
     const nuevoGasto = {
@@ -116,7 +111,6 @@ export function useGastos() {
     await persistirDatos();
   }, []);
 
-  // ── Categorías ──────────────────────────────────────────────────────────────
 
   const agregarCategoria = useCallback(async ({ nombre, color }) => {
     const nueva = { id: Date.now().toString(), nombre, color };
@@ -139,16 +133,115 @@ export function useGastos() {
     await persistirDatos();
   }, []);
 
-  // ── Opciones / zona de peligro ───────────────────────────────────────────────
+  const exportarDatos = useCallback(async () => {
+    try {
+      const payload = {
+        app: 'gastos_app',
+        version: VERSION_EXPORT,
+        exportadoEn: new Date().toISOString(),
+        categorias: categoriasEnMemoria,
+        gastos: gastosEnMemoria,
+      };
 
-  /** Pone todos los montos en $0 (mantiene los registros y categorías) */
+      const json = JSON.stringify(payload, null, 2);
+      const nombreArchivo = `gastos_backup_${new Date().toISOString().slice(0, 10)}.json`;
+      const ruta = FileSystem.documentDirectory + nombreArchivo;
+
+      await FileSystem.writeAsStringAsync(ruta, json, {
+        encoding: FileSystem.EncodingType.UTF8,
+      });
+
+      const puedeCompartir = await Sharing.isAvailableAsync();
+      if (puedeCompartir) {
+        await Sharing.shareAsync(ruta, {
+          mimeType: 'application/json',
+          dialogTitle: 'Exportar datos de Gastos',
+          UTI: 'public.json',
+        });
+      }
+
+      return { ok: true, ruta, totalGastos: gastosEnMemoria.length };
+    } catch (e) {
+      console.error('[useGastos] Error al exportar datos:', e);
+      return { ok: false, error: e.message };
+    }
+  }, []);
+
+  const importarDatos = useCallback(async ({ modo = 'reemplazar' } = {}) => {
+    try {
+      const resultado = await DocumentPicker.getDocumentAsync({
+        type: 'application/json',
+        copyToCacheDirectory: true,
+      });
+
+      if (resultado.canceled || !resultado.assets?.length) {
+        return { ok: false, cancelado: true };
+      }
+
+      const archivo = resultado.assets[0];
+      const contenido = await FileSystem.readAsStringAsync(archivo.uri, {
+        encoding: FileSystem.EncodingType.UTF8,
+      });
+
+      const datos = JSON.parse(contenido);
+
+      const gastosImportados = Array.isArray(datos.gastos) ? datos.gastos : null;
+      const categoriasImportadas = Array.isArray(datos.categorias) ? datos.categorias : null;
+
+      if (!gastosImportados || !categoriasImportadas) {
+        return { ok: false, error: 'El archivo no tiene el formato esperado.' };
+      }
+
+      const gastosValidos = gastosImportados.every(
+        (g) =>
+          g &&
+          typeof g.id !== 'undefined' &&
+          typeof g.monto === 'number' &&
+          typeof g.categoria !== 'undefined' &&
+          typeof g.fecha === 'string',
+      );
+      const categoriasValidas = categoriasImportadas.every(
+        (c) => c && typeof c.id !== 'undefined' && typeof c.nombre === 'string',
+      );
+
+      if (!gastosValidos || !categoriasValidas) {
+        return { ok: false, error: 'El archivo tiene datos con formato inválido.' };
+      }
+
+      if (modo === 'combinar') {
+        const idsExistentes = new Set(gastosEnMemoria.map((g) => g.id));
+        const nuevosGastos = gastosImportados.filter((g) => !idsExistentes.has(g.id));
+        gastosEnMemoria = [...nuevosGastos, ...gastosEnMemoria];
+
+        const idsCatExistentes = new Set(categoriasEnMemoria.map((c) => c.id));
+        const nuevasCategorias = categoriasImportadas.filter((c) => !idsCatExistentes.has(c.id));
+        categoriasEnMemoria = [...categoriasEnMemoria, ...nuevasCategorias];
+      } else {
+        gastosEnMemoria = gastosImportados;
+        categoriasEnMemoria = categoriasImportadas;
+      }
+
+      emitirCambio();
+      await persistirDatos();
+
+      return {
+        ok: true,
+        totalGastos: gastosImportados.length,
+        totalCategorias: categoriasImportadas.length,
+      };
+    } catch (e) {
+      console.error('[useGastos] Error al importar datos:', e);
+      return { ok: false, error: 'No se pudo leer el archivo. ¿Es un JSON válido exportado desde la app?' };
+    }
+  }, []);
+
+
   const limpiarGastos = useCallback(async () => {
     gastosEnMemoria = gastosEnMemoria.map((g) => ({ ...g, monto: 0 }));
     emitirCambio();
     await persistirDatos();
   }, []);
 
-  /** Borra todos los gastos y resetea categorías a las iniciales */
   const eliminarTodo = useCallback(async () => {
     gastosEnMemoria = [];
     categoriasEnMemoria = [...CATEGORIAS_INICIALES];
@@ -156,7 +249,6 @@ export function useGastos() {
     await persistirDatos();
   }, []);
 
-  // ── Cálculos derivados ───────────────────────────────────────────────────────
   const gastosDelMes = gastos.filter((g) => {
     const fecha = new Date(g.fecha);
     const ahora = new Date();
@@ -177,7 +269,7 @@ export function useGastos() {
     // Estado
     gastos,
     categorias,
-    cargando,          // ← útil para mostrar un splash/loader mientras lee el JSON
+    cargando,
     // Gastos derivados
     gastosDelMes,
     totalMes,
@@ -192,5 +284,8 @@ export function useGastos() {
     // Acciones de opciones
     limpiarGastos,
     eliminarTodo,
+    // Exportar / Importar
+    exportarDatos,
+    importarDatos,
   };
 }

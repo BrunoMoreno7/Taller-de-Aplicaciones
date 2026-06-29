@@ -3,6 +3,7 @@ import {
   View, Text, StyleSheet, FlatList, TouchableOpacity,
   TextInput, Modal, ScrollView
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
 import { useGastos } from '../hooks/useGastos';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -12,6 +13,7 @@ import ColorPicker from 'react-native-wheel-color-picker';
 export default function GestionCategoriasScreen() {
   const { theme, accentColor } = useTheme();
   const { categorias, agregarCategoria, eliminarCategoria, editarCategoria } = useGastos();
+  const insets = useSafeAreaInsets();
 
   const [modalVisible, setModalVisible] = useState(false);
   const [confirmModalVisible, setConfirmModalVisible] = useState(false); // Nuevo modal

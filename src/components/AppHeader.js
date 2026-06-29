@@ -1,12 +1,13 @@
 import React from 'react';
-import { View, Text, StyleSheet, SafeAreaView } from 'react-native';
-import { useTheme } from '../context/ThemeContext'; // Importar el hook
+import { View, Text, StyleSheet } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { useTheme } from '../context/ThemeContext'; 
 
 export default function AppHeader() {
-  const { accentColor } = useTheme(); // Obtener el color elegido
+  const { accentColor } = useTheme(); 
 
   return (
-    <SafeAreaView style={{ backgroundColor: accentColor }}>
+    <SafeAreaView edges={['top']} style={{ backgroundColor: accentColor }}>
       <View style={[styles.header, { backgroundColor: accentColor }]}>
         <Text style={styles.title}>Money's Gone 😞</Text>
       </View>
@@ -19,7 +20,6 @@ const styles = StyleSheet.create({
     height: 60,
     justifyContent: 'center',
     alignItems: 'center',
-    // Quitamos el color fijo de aquí para que mande el estilo en línea
   },
   title: {
     color: 'white',
