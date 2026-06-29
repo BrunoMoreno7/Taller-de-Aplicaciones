@@ -6,16 +6,15 @@ import {
   FlatList,
   TouchableOpacity,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import AppHeader from '../components/AppHeader';
 import { useGastos } from '../hooks/useGastos';
 import { useTheme } from '../context/ThemeContext';
 
-// Pasamos 'categorias' como prop a GastoItem
 function GastoItem({ item, onEliminar, categorias }) {
   const { theme } = useTheme();
 
-  // Buscamos el color en nuestra lista dinámica de categorías
   const colorCat = categorias.find(c => c.nombre === item.categoria)?.color || '#CCC';
 
   const fecha = new Date(item.fecha);
@@ -41,7 +40,6 @@ function GastoItem({ item, onEliminar, categorias }) {
       onLongPress={confirmarEliminar}
       activeOpacity={0.75}
     >
-      {/* Usamos colorCat para el fondo del tag y blanco para el texto por contraste */}
       <View style={[styles.categoriaTag, { backgroundColor: colorCat }]}>
         <Text style={[styles.categoriaText, { color: '#FFFFFF' }]}>
           {item.categoria}
@@ -65,14 +63,25 @@ function GastoItem({ item, onEliminar, categorias }) {
 }
 
 export default function HomeScreen({ navigation }) {
-  // 1. Obtenemos 'categorias' del hook para poder pasarlas a la lista
-  const { gastosDelMes, totalMes, eliminarGasto, categorias } = useGastos();
+  const { gastosDelMes, totalMes, eliminarGasto, categorias, cargando } = useGastos();
   const { theme, accentColor } = useTheme();
 
   const mesActual = new Date().toLocaleDateString('es-UY', {
     month: 'long',
     year: 'numeric',
   });
+
+  // Pantalla de carga mientras AsyncStorage devuelve los datos
+  if (cargando) {
+    return (
+      <View style={[styles.container, styles.centered, { backgroundColor: theme.colors.background }]}>
+        <ActivityIndicator size="large" color={accentColor} />
+        <Text style={[styles.cargandoText, { color: theme.colors.text }]}>
+          Cargando tus gastos…
+        </Text>
+      </View>
+    );
+  }
 
   const renderEmpty = () => (
     <View style={styles.emptyContainer}>
@@ -87,7 +96,6 @@ export default function HomeScreen({ navigation }) {
     <View style={[styles.container, { backgroundColor: theme.colors.background }]}>
       <AppHeader />
 
-      {/* Resumen Card con accentColor dinámico */}
       <View style={[styles.resumenCard, { backgroundColor: accentColor, shadowColor: accentColor }]}>
         <Text style={styles.resumenLabel}>
           Total {mesActual.charAt(0).toUpperCase() + mesActual.slice(1)}
@@ -110,7 +118,7 @@ export default function HomeScreen({ navigation }) {
             <GastoItem
               item={item}
               onEliminar={eliminarGasto}
-              categorias={categorias} // Enviamos la lista de categorías aquí
+              categorias={categorias}
             />
           )}
           ListEmptyComponent={renderEmpty}
@@ -135,6 +143,15 @@ export default function HomeScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  centered: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 12,
+  },
+  cargandoText: {
+    fontSize: 15,
+    opacity: 0.6,
   },
   resumenCard: {
     marginHorizontal: 16,

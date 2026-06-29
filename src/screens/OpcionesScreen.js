@@ -103,10 +103,17 @@ export default function OpcionesScreen({ navigation }) {
         <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Datos y Cuenta</Text>
 
         <OptionButton
-          icon="file-pdf-box"
+          icon="upload"
           title="Exportar Reporte"
-          subtitle="Enviar datos en PDF o JSON por mail"
+          subtitle="Enviar datos en PDF o JSON"
           onPress={() => Alert.alert("Próximamente", "Esta función estará disponible en la siguiente actualización きっとmaybe.")}
+        />
+
+        <OptionButton
+        icon="download"
+        title="Importar Datos"
+        subtitle="Importar gastos desde JSON"
+        onPress={()=> Alert.alert("Ahora lo hago")}
         />
 
         <Text style={[styles.sectionTitle, { color: '#FF4444' }]}>Zona de Peligro</Text>
