@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import {
-  View,  Text,
+  View,
+  Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
@@ -8,27 +9,94 @@ import {
   Switch,
   Alert,
   ActivityIndicator,
+  Platform,
 } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
 import AppHeader from '../components/AppHeader';
 import ColorPicker from 'react-native-wheel-color-picker';
 
-// Importamos useGastos para las acciones de borrado
+// Importamos useGastos
 import { useGastos } from '../hooks/useGastos';
 
 export default function OpcionesScreen({ navigation }) {
   const { isDarkMode, setIsDarkMode, accentColor, setAccentColor, theme } = useTheme();
-  const { limpiarGastos, eliminarTodo, exportarDatos, importarDatos } = useGastos();
+
+  // Extraemos todas las funciones necesarias del hook
+  const {
+    limpiarGastos,
+    eliminarTodo,
+    exportarDatos,
+    importarDatos
+  } = useGastos();
 
   const [modalVisible, setModalVisible] = useState(false);
+  const [resetModalVisible, setResetModalVisible] = useState(false);
+  const [borrarTodoModalVisible, setBorrarTodoModalVisible] = useState(false); // Modal extra para borrar todo
   const [tempColor, setTempColor] = useState(accentColor);
   const [procesando, setProcesando] = useState(false);
-  const insets = useSafeAreaInsets();
 
-  const handleColorChange = (color) => {
-    setTempColor(color);
+  // --- LÓGICA DE EXPORTACIÓN ---
+  const handleExportar = async () => {
+    if (procesando) return;
+    setProcesando(true);
+    try {
+      const resultado = await exportarDatos();
+      if (!resultado.ok) {
+        Alert.alert('Error al exportar', resultado.error || 'No se pudo generar el archivo.');
+      } else {
+        Alert.alert('Exportación lista', `Se exportaron ${resultado.totalGastos} gastos en formato JSON.`);
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Ocurrió un error inesperado al exportar.');
+    } finally {
+      setProcesando(false);
+    }
+  };
+
+  // --- LÓGICA DE IMPORTACIÓN ---
+  const handleImportar = () => {
+    if (Platform.OS === 'web') {
+      // En web, el confirm nativo es más confiable para acciones rápidas
+      const conf = window.confirm("¿Deseas REEMPLAZAR tus datos actuales? (Aceptar para Reemplazar, Cancelar para Combinar)");
+      ejecutarImportacion(conf ? 'reemplazar' : 'combinar');
+    } else {
+      Alert.alert(
+        'Importar Datos',
+        '¿Cómo querés importar el archivo JSON?',
+        [
+          { text: 'Cancelar', style: 'cancel' },
+          { text: 'Combinar', onPress: () => ejecutarImportacion('combinar') },
+          { text: 'Reemplazar todo', style: 'destructive', onPress: () => ejecutarImportacion('reemplazar') },
+        ]
+      );
+    }
+  };
+
+  const ejecutarImportacion = async (modo) => {
+    setProcesando(true);
+    try {
+      // Llamada directa al hook
+      const resultado = await importarDatos({ modo });
+
+      if (resultado.cancelado) {
+        setProcesando(false);
+        return;
+      }
+
+      if (!resultado.ok) {
+        // En Web usamos alert nativo si Alert de RN falla
+        const msg = resultado.error || 'No se pudo leer el archivo.';
+        Platform.OS === 'web' ? alert(msg) : Alert.alert('Error', msg);
+      } else {
+        const msgExito = `¡Éxito! Se importaron ${resultado.totalGastos} gastos y ${resultado.totalCategorias} categorías.`;
+        Platform.OS === 'web' ? alert(msgExito) : Alert.alert('Importación completa', msgExito);
+      }
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setProcesando(false);
+    }
   };
 
   const saveColor = () => {
@@ -36,84 +104,24 @@ export default function OpcionesScreen({ navigation }) {
     setModalVisible(false);
   };
 
-  // Exportar todos los gastos y categorías a un archivo .json y compartirlo
-  const handleExportar = async () => {
-    if (procesando) return;
-    setProcesando(true);
-    const resultado = await exportarDatos();
-    setProcesando(false);
-
-    if (!resultado.ok) {
-      Alert.alert('Error al exportar', resultado.error || 'No se pudo generar el archivo.');
-      return;
-    }
-    Alert.alert('Exportación lista', `Se exportaron ${resultado.totalGastos} gastos en formato JSON.`);
+  const ejecutarReinicio = () => {
+    limpiarGastos();
+    setResetModalVisible(false);
+    if (Platform.OS === 'web') alert("Montos reiniciados a $0");
   };
 
-  // Importar gastos/categorías desde un archivo .json elegido por el usuario
-  const handleImportar = () => {
-    if (procesando) return;
-    Alert.alert(
-      'Importar Datos',
-      '¿Cómo querés importar el archivo JSON?',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Combinar',
-          onPress: () => ejecutarImportacion('combinar'),
-        },
-        {
-          text: 'Reemplazar todo',
-          style: 'destructive',
-          onPress: () => ejecutarImportacion('reemplazar'),
-        },
-      ],
-    );
+  const ejecutarBorradoTotal = () => {
+    eliminarTodo();
+    setBorrarTodoModalVisible(false);
+    if (Platform.OS === 'web') alert("Todos los datos han sido eliminados");
   };
 
-  const ejecutarImportacion = async (modo) => {
-    setProcesando(true);
-    const resultado = await importarDatos({ modo });
-    setProcesando(false);
-
-    if (resultado.cancelado) return;
-
-    if (!resultado.ok) {
-      Alert.alert('Error al importar', resultado.error || 'No se pudo leer el archivo.');
-      return;
-    }
-
-    Alert.alert(
-      'Importación completa',
-      `Se importaron ${resultado.totalGastos} gastos y ${resultado.totalCategorias} categorías.`,
-    );
-  };
-
-  // Función para confirmar borrado de datos
-  const confirmarAccion = (tipo) => {
-    const esBorradoTotal = tipo === 'todo';
-    Alert.alert(
-      esBorradoTotal ? "Eliminar Todo" : "Reiniciar Montos",
-      esBorradoTotal
-        ? "¿Estás seguro de borrar todos los gastos y categorías? Esta acción es permanente."
-        : "¿Seguro que quieres poner todos los gastos en $0 manteniendo las categorías?",
-      [
-        { text: "Cancelar", style: "cancel" },
-        {
-          text: "Confirmar",
-          style: "destructive",
-          onPress: () => esBorradoTotal ? eliminarTodo() : limpiarGastos()
-        }
-      ]
-    );
-  };
-
-  // Componente reutilizable para los botones de opción
   const OptionButton = ({ icon, title, subtitle, onPress, isDestructive = false }) => (
     <TouchableOpacity
       style={[styles.optionItem, { backgroundColor: theme.colors.card }]}
       onPress={onPress}
       activeOpacity={0.7}
+      disabled={procesando}
     >
       <View style={[styles.iconContainer, { backgroundColor: isDestructive ? '#FF444422' : accentColor + '22' }]}>
         <MaterialCommunityIcons
@@ -128,7 +136,11 @@ export default function OpcionesScreen({ navigation }) {
         </Text>
         <Text style={styles.optionSubtitle}>{subtitle}</Text>
       </View>
-      <MaterialCommunityIcons name="chevron-right" size={24} color="#CCC" />
+      {procesando && isDestructive ? (
+         <ActivityIndicator size="small" color="#FF4444" />
+      ) : (
+        <MaterialCommunityIcons name="chevron-right" size={24} color="#CCC" />
+      )}
     </TouchableOpacity>
   );
 
@@ -137,9 +149,9 @@ export default function OpcionesScreen({ navigation }) {
       <AppHeader />
 
       <ScrollView contentContainerStyle={styles.scroll}>
+        {procesando && <ActivityIndicator color={accentColor} style={{marginBottom: 10}} />}
 
         <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Apariencia</Text>
-
         <OptionButton
           icon="palette"
           title="Personalizar Tema"
@@ -149,7 +161,6 @@ export default function OpcionesScreen({ navigation }) {
             setModalVisible(true);
           }}
         />
-
         <OptionButton
           icon="tag-multiple"
           title="Gestionar Categorías"
@@ -158,105 +169,101 @@ export default function OpcionesScreen({ navigation }) {
         />
 
         <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Datos y Cuenta</Text>
-
-        <OptionButton
-          icon="upload"
-          title="Exportar Reporte"
-          subtitle="Guardar o compartir tus datos en JSON"
-          onPress={handleExportar}
-        />
-
         <OptionButton
           icon="download"
-          title="Importar Datos"
-          subtitle="Cargar gastos y categorías desde un JSON"
+          title="Exportar Datos (JSON)"
+          subtitle="Crear una copia de seguridad"
+          onPress={handleExportar}
+        />
+        <OptionButton
+          icon="upload"
+          title="Importar Datos (JSON)"
+          subtitle="Restaurar desde un archivo"
           onPress={handleImportar}
         />
 
-        {procesando && (
-          <View style={styles.procesandoBox}>
-            <ActivityIndicator color={accentColor} />
-            <Text style={[styles.procesandoText, { color: theme.colors.text }]}>Procesando…</Text>
-          </View>
-        )}
-
         <Text style={[styles.sectionTitle, { color: '#FF4444' }]}>Zona de Peligro</Text>
-
         <OptionButton
           icon="refresh"
           title="Reiniciar montos a $0"
           subtitle="Limpiar gastos del mes actual"
-          onPress={() => confirmarAccion('limpiar')}
+          onPress={() => setResetModalVisible(true)}
           isDestructive
         />
-
         <OptionButton
           icon="trash-can"
           title="Borrar todos los datos"
           subtitle="Eliminar gastos e historial completo"
-          onPress={() => confirmarAccion('todo')}
+          onPress={() => setBorrarTodoModalVisible(true)}
           isDestructive
         />
 
-        {/* --- MODAL DE PERSONALIZACIÓN --- */}
-        <Modal
-          animationType="fade"
-          transparent={true}
-          visible={modalVisible}
-          onRequestClose={() => setModalVisible(false)}
-        >
+        {/* MODAL COLOR */}
+        <Modal animationType="fade" transparent={true} visible={modalVisible}>
           <View style={styles.modalOverlay}>
             <View style={[styles.modalContent, { backgroundColor: theme.colors.card }]}>
               <Text style={[styles.modalTitle, { color: theme.colors.text }]}>Personalizar</Text>
-
-              <View style={[
-                styles.darkModeBox,
-                { backgroundColor: theme.dark ? '#2A2A2A' : '#F0F0F0' }
-              ]}>
+              <View style={[styles.darkModeBox, { backgroundColor: theme.dark ? '#2A2A2A' : '#F0F0F0' }]}>
                 <View style={styles.settingRow}>
-                  <View style={styles.rowInfo}>
-                    <MaterialCommunityIcons
-                      name={isDarkMode ? "weather-night" : "weather-sunny"}
-                      size={20}
-                      color={theme.colors.text}
-                    />
-                    <Text style={[styles.rowText, { color: theme.colors.text }]}>Modo Oscuro</Text>
-                  </View>
+                  <Text style={[styles.rowText, { color: theme.colors.text }]}>Modo Oscuro</Text>
                   <Switch
                     value={isDarkMode}
                     onValueChange={setIsDarkMode}
                     trackColor={{ false: "#767577", true: accentColor }}
-                    thumbColor={isDarkMode ? accentColor : "#f4f3f4"}
                   />
                 </View>
               </View>
-
-              <Text style={[styles.pickerLabel, { color: theme.colors.text }]}>Color de énfasis</Text>
-
               <View style={styles.pickerContainer}>
-                <ColorPicker
-                  color={tempColor}
-                  onColorChange={handleColorChange}
-                  thumbSize={25}
-                  sliderSize={25}
-                  noSnap={true}
-                  row={false}
-                />
+                <ColorPicker color={tempColor} onColorChange={setTempColor} thumbSize={25} sliderSize={25} noSnap={true} row={false} />
               </View>
-
               <View style={styles.buttonRow}>
-                <TouchableOpacity
-                  style={[styles.btn, styles.cancelBtn]}
-                  onPress={() => setModalVisible(false)}
-                >
+                <TouchableOpacity style={styles.cancelBtn} onPress={() => setModalVisible(false)}>
                   <Text style={styles.cancelBtnText}>Cancelar</Text>
                 </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={[styles.btn, { backgroundColor: tempColor }]}
-                  onPress={saveColor}
-                >
+                <TouchableOpacity style={[styles.btn, { backgroundColor: tempColor }]} onPress={saveColor}>
                   <Text style={styles.saveBtnText}>Guardar</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* MODAL REINICIAR $0 */}
+        <Modal animationType="fade" transparent={true} visible={resetModalVisible}>
+          <View style={styles.modalOverlay}>
+            <View style={[styles.confirmContent, { backgroundColor: theme.colors.card }]}>
+              <MaterialCommunityIcons name="refresh-circle" size={60} color={accentColor} style={styles.modalIcon} />
+              <Text style={[styles.modalTitle, { color: theme.colors.text }]}>¿Reiniciar montos?</Text>
+              <Text style={[styles.modalDescription, { color: theme.colors.text }]}>
+                Se pondrán todos tus gastos en <Text style={{fontWeight: 'bold'}}>$0</Text>. Las categorías no se borrarán.
+              </Text>
+              <View style={styles.buttonRow}>
+                <TouchableOpacity style={styles.cancelBtn} onPress={() => setResetModalVisible(false)}>
+                  <Text style={styles.cancelBtnText}>Cancelar</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.btn, { backgroundColor: accentColor }]} onPress={ejecutarReinicio}>
+                  <Text style={styles.saveBtnText}>Reiniciar</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* MODAL BORRAR TODO */}
+        <Modal animationType="fade" transparent={true} visible={borrarTodoModalVisible}>
+          <View style={styles.modalOverlay}>
+            <View style={[styles.confirmContent, { backgroundColor: theme.colors.card }]}>
+              <MaterialCommunityIcons name="alert-octagon" size={60} color="#FF4444" style={styles.modalIcon} />
+              <Text style={[styles.modalTitle, { color: '#FF4444' }]}>¿Borrar todo?</Text>
+              <Text style={[styles.modalDescription, { color: theme.colors.text }]}>
+                Se eliminarán permanentemente <Text style={{fontWeight: 'bold'}}>todos los gastos y categorías</Text> creadas.
+              </Text>
+              <View style={styles.buttonRow}>
+                <TouchableOpacity style={styles.cancelBtn} onPress={() => setBorrarTodoModalVisible(false)}>
+                  <Text style={styles.cancelBtnText}>Cancelar</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.btn, { backgroundColor: '#FF4444' }]} onPress={ejecutarBorradoTotal}>
+                  <Text style={styles.saveBtnText}>Borrar Todo</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -271,85 +278,25 @@ export default function OpcionesScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   scroll: { padding: 20, paddingBottom: 40 },
-  sectionTitle: {
-    fontSize: 12,
-    fontWeight: '800',
-    marginBottom: 10,
-    marginTop: 25,
-    textTransform: 'uppercase',
-    opacity: 0.6
-  },
-  optionItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 15,
-    borderRadius: 16,
-    marginBottom: 10,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 5
-  },
-  iconContainer: {
-    width: 45,
-    height: 45,
-    borderRadius: 12,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 15
-  },
+  sectionTitle: { fontSize: 12, fontWeight: '800', marginBottom: 10, marginTop: 25, textTransform: 'uppercase', opacity: 0.6 },
+  optionItem: { flexDirection: 'row', alignItems: 'center', padding: 15, borderRadius: 16, marginBottom: 10, elevation: 2 },
+  iconContainer: { width: 45, height: 45, borderRadius: 12, justifyContent: 'center', alignItems: 'center', marginRight: 15 },
   optionTextContainer: { flex: 1 },
   optionTitle: { fontSize: 16, fontWeight: '700' },
   optionSubtitle: { fontSize: 12, color: '#888', marginTop: 2 },
-
-  procesandoBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 10,
-    marginBottom: 5,
-  },
-  procesandoText: { marginLeft: 10, fontSize: 13, opacity: 0.7 },
-
-  // Modal Styles
   modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center' },
-  modalContent: { width: '90%', height: 550, padding: 20, borderRadius: 25, elevation: 10 },
-  modalTitle: { fontSize: 22, fontWeight: 'bold', marginBottom: 20, textAlign: 'center' },
-
-  darkModeBox: {
-    borderRadius: 15,
-    paddingHorizontal: 15,
-    paddingVertical: 10,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.05)',
-  },
-  settingRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center'
-  },
-  rowInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  rowText: {
-    fontSize: 16,
-    fontWeight: '600',
-    marginLeft: 10,
-  },
-  pickerLabel: {
-    fontSize: 14,
-    fontWeight: '700',
-    marginBottom: 10,
-    opacity: 0.6,
-    textTransform: 'uppercase',
-  },
+  modalContent: { width: '90%', height: 550, padding: 20, borderRadius: 25 },
+  confirmContent: { width: '85%', padding: 25, borderRadius: 25, alignItems: 'center' },
+  modalTitle: { fontSize: 22, fontWeight: 'bold', marginBottom: 10, textAlign: 'center' },
+  modalIcon: { marginBottom: 15 },
+  modalDescription: { textAlign: 'center', fontSize: 16, marginBottom: 25, lineHeight: 22 },
+  darkModeBox: { borderRadius: 15, padding: 15, marginBottom: 20 },
+  settingRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  rowText: { fontSize: 16, fontWeight: '600' },
   pickerContainer: { flex: 1, marginBottom: 20 },
-  buttonRow: { flexDirection: 'row', justifyContent: 'space-between' },
+  buttonRow: { flexDirection: 'row', justifyContent: 'space-between', width: '100%' },
   btn: { flex: 0.48, padding: 15, borderRadius: 12, alignItems: 'center' },
-  cancelBtn: { backgroundColor: '#EEE' },
+  cancelBtn: { flex: 0.48, padding: 15, borderRadius: 12, backgroundColor: '#EEE', alignItems: 'center' },
   cancelBtnText: { color: '#333', fontWeight: 'bold' },
   saveBtnText: { color: 'white', fontWeight: 'bold' }
 });

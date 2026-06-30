@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useSyncExternalStore } from 'react';
+import { useCallback, useSyncExternalStore } from 'react';
+import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
@@ -17,14 +18,13 @@ const CATEGORIAS_INICIALES = [
 
 let gastosEnMemoria = [];
 let categoriasEnMemoria = [...CATEGORIAS_INICIALES];
-let cargadoDesdeStorage = false;   // flag: la carga inicial ya ocurrió
 
 const listeners = new Set();
 
 let estadoGlobal = {
   gastos: gastosEnMemoria,
   categorias: categoriasEnMemoria,
-  cargando: true,                  // mientras no se lee AsyncStorage
+  cargando: true,
 };
 
 function obtenerDatos() {
@@ -62,47 +62,25 @@ async function cargarDatos() {
       STORAGE_KEY_GASTOS,
       STORAGE_KEY_CATEGORIAS,
     ]);
-
-    const gastosGuardados     = resultado[0][1];
-    const categoriasGuardadas = resultado[1][1];
-
-    if (gastosGuardados !== null) {
-      gastosEnMemoria = JSON.parse(gastosGuardados);
-    }
-
-    if (categoriasGuardadas !== null) {
-      categoriasEnMemoria = JSON.parse(categoriasGuardadas);
-    }
+    if (resultado[0][1] !== null) gastosEnMemoria = JSON.parse(resultado[0][1]);
+    if (resultado[1][1] !== null) categoriasEnMemoria = JSON.parse(resultado[1][1]);
   } catch (e) {
-    console.error('[useGastos] Error al cargar datos:', e);
+    console.error('[useGastos] Error al cargar:', e);
   } finally {
-    cargadoDesdeStorage = true;
-    emitirCambio(false); // cargando = false → notifica a todos los componentes
+    emitirCambio(false);
   }
 }
 
 cargarDatos();
 
 export function useGastos() {
-  const { gastos, categorias, cargando } = useSyncExternalStore(
-    suscribirse,
-    obtenerDatos,
-    obtenerDatos,
-  );
+  const { gastos, categorias, cargando } = useSyncExternalStore(suscribirse, obtenerDatos, obtenerDatos);
 
-
-  const agregarGasto = useCallback(async ({ monto, categoria, descripcion }) => {
-    const nuevoGasto = {
-      id: Date.now().toString(),
-      monto: parseFloat(monto),
-      categoria,
-      descripcion: descripcion || '',
-      fecha: new Date().toISOString(),
-    };
-    gastosEnMemoria = [nuevoGasto, ...gastosEnMemoria];
+  const agregarGasto = useCallback(async (gasto) => {
+    const nuevo = { ...gasto, id: Date.now().toString(), fecha: new Date().toISOString() };
+    gastosEnMemoria = [nuevo, ...gastosEnMemoria];
     emitirCambio();
     await persistirDatos();
-    return nuevoGasto;
   }, []);
 
   const eliminarGasto = useCallback(async (id) => {
@@ -111,28 +89,26 @@ export function useGastos() {
     await persistirDatos();
   }, []);
 
-
-  const agregarCategoria = useCallback(async ({ nombre, color }) => {
-    const nueva = { id: Date.now().toString(), nombre, color };
+  const agregarCategoria = useCallback(async (cat) => {
+    const nueva = { ...cat, id: Date.now().toString() };
     categoriasEnMemoria = [...categoriasEnMemoria, nueva];
     emitirCambio();
     await persistirDatos();
   }, []);
 
-  const editarCategoria = useCallback(async (id, nuevosDatos) => {
-    categoriasEnMemoria = categoriasEnMemoria.map((c) =>
-      c.id === id ? { ...c, ...nuevosDatos } : c,
-    );
+  const editarCategoria = useCallback(async (id, datos) => {
+    categoriasEnMemoria = categoriasEnMemoria.map(c => c.id === id ? { ...c, ...datos } : c);
     emitirCambio();
     await persistirDatos();
   }, []);
 
   const eliminarCategoria = useCallback(async (id) => {
-    categoriasEnMemoria = categoriasEnMemoria.filter((c) => c.id !== id);
+    categoriasEnMemoria = categoriasEnMemoria.filter(c => c.id !== id);
     emitirCambio();
     await persistirDatos();
   }, []);
 
+  // --- EXPORTAR (WEB + MÓVIL) ---
   const exportarDatos = useCallback(async () => {
     try {
       const payload = {
@@ -142,102 +118,90 @@ export function useGastos() {
         categorias: categoriasEnMemoria,
         gastos: gastosEnMemoria,
       };
-
       const json = JSON.stringify(payload, null, 2);
       const nombreArchivo = `gastos_backup_${new Date().toISOString().slice(0, 10)}.json`;
-      const ruta = FileSystem.documentDirectory + nombreArchivo;
 
-      await FileSystem.writeAsStringAsync(ruta, json, {
-        encoding: FileSystem.EncodingType.UTF8,
-      });
-
-      const puedeCompartir = await Sharing.isAvailableAsync();
-      if (puedeCompartir) {
-        await Sharing.shareAsync(ruta, {
-          mimeType: 'application/json',
-          dialogTitle: 'Exportar datos de Gastos',
-          UTI: 'public.json',
-        });
+      if (Platform.OS === 'web') {
+        const blob = new Blob([json], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = nombreArchivo;
+        link.click();
+        URL.revokeObjectURL(url);
+        return { ok: true, totalGastos: gastosEnMemoria.length };
       }
 
-      return { ok: true, ruta, totalGastos: gastosEnMemoria.length };
+      const ruta = FileSystem.documentDirectory + nombreArchivo;
+      await FileSystem.writeAsStringAsync(ruta, json, { encoding: FileSystem.EncodingType.UTF8 });
+      if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(ruta);
+      return { ok: true, totalGastos: gastosEnMemoria.length };
     } catch (e) {
-      console.error('[useGastos] Error al exportar datos:', e);
       return { ok: false, error: e.message };
     }
   }, []);
 
+  // --- IMPORTAR (WEB + MÓVIL) ---
   const importarDatos = useCallback(async ({ modo = 'reemplazar' } = {}) => {
     try {
-      const resultado = await DocumentPicker.getDocumentAsync({
+      const res = await DocumentPicker.getDocumentAsync({
         type: 'application/json',
-        copyToCacheDirectory: true,
+        copyToCacheDirectory: true // Importante para estabilidad
       });
 
-      if (resultado.canceled || !resultado.assets?.length) {
-        return { ok: false, cancelado: true };
+      if (res.canceled || !res.assets) return { ok: false, cancelado: true };
+
+      const uri = res.assets[0].uri;
+      let contenido;
+
+      if (Platform.OS === 'web') {
+        // En Web, la URI es un blob local, fetch es la forma más segura de leerlo
+        const response = await fetch(uri);
+        contenido = await response.text();
+      } else {
+        contenido = await FileSystem.readAsStringAsync(uri, {
+          encoding: FileSystem.EncodingType.UTF8,
+        });
       }
-
-      const archivo = resultado.assets[0];
-      const contenido = await FileSystem.readAsStringAsync(archivo.uri, {
-        encoding: FileSystem.EncodingType.UTF8,
-      });
 
       const datos = JSON.parse(contenido);
 
-      const gastosImportados = Array.isArray(datos.gastos) ? datos.gastos : null;
-      const categoriasImportadas = Array.isArray(datos.categorias) ? datos.categorias : null;
-
-      if (!gastosImportados || !categoriasImportadas) {
-        return { ok: false, error: 'El archivo no tiene el formato esperado.' };
-      }
-
-      const gastosValidos = gastosImportados.every(
-        (g) =>
-          g &&
-          typeof g.id !== 'undefined' &&
-          typeof g.monto === 'number' &&
-          typeof g.categoria !== 'undefined' &&
-          typeof g.fecha === 'string',
-      );
-      const categoriasValidas = categoriasImportadas.every(
-        (c) => c && typeof c.id !== 'undefined' && typeof c.nombre === 'string',
-      );
-
-      if (!gastosValidos || !categoriasValidas) {
-        return { ok: false, error: 'El archivo tiene datos con formato inválido.' };
+      // Validación básica de estructura
+      if (!datos.gastos || !datos.categorias) {
+        throw new Error('El archivo no tiene el formato correcto de Money\'s Gone.');
       }
 
       if (modo === 'combinar') {
-        const idsExistentes = new Set(gastosEnMemoria.map((g) => g.id));
-        const nuevosGastos = gastosImportados.filter((g) => !idsExistentes.has(g.id));
+        const idsExistentes = new Set(gastosEnMemoria.map(g => g.id));
+        const nuevosGastos = datos.gastos.filter(g => !idsExistentes.has(g.id));
         gastosEnMemoria = [...nuevosGastos, ...gastosEnMemoria];
 
-        const idsCatExistentes = new Set(categoriasEnMemoria.map((c) => c.id));
-        const nuevasCategorias = categoriasImportadas.filter((c) => !idsCatExistentes.has(c.id));
-        categoriasEnMemoria = [...categoriasEnMemoria, ...nuevasCategorias];
+        const nombresCatExistentes = new Set(categoriasEnMemoria.map(c => c.nombre.toLowerCase()));
+        const nuevasCats = datos.categorias.filter(c => !nombresCatExistentes.has(c.nombre.toLowerCase()));
+        categoriasEnMemoria = [...categoriasEnMemoria, ...nuevasCats];
       } else {
-        gastosEnMemoria = gastosImportados;
-        categoriasEnMemoria = categoriasImportadas;
+        // Reemplazo total
+        gastosEnMemoria = datos.gastos;
+        categoriasEnMemoria = datos.categorias;
       }
 
+      // CRUCIAL: Actualizar estado y persistir
       emitirCambio();
       await persistirDatos();
 
       return {
         ok: true,
-        totalGastos: gastosImportados.length,
-        totalCategorias: categoriasImportadas.length,
+        totalGastos: datos.gastos.length,
+        totalCategorias: datos.categorias.length
       };
     } catch (e) {
-      console.error('[useGastos] Error al importar datos:', e);
-      return { ok: false, error: 'No se pudo leer el archivo. ¿Es un JSON válido exportado desde la app?' };
+      console.error('[useGastos] Error importando:', e);
+      return { ok: false, error: e.message };
     }
-  }, []);
-
+  }, [gastos, categorias]);
 
   const limpiarGastos = useCallback(async () => {
-    gastosEnMemoria = gastosEnMemoria.map((g) => ({ ...g, monto: 0 }));
+    gastosEnMemoria = gastosEnMemoria.map(g => ({ ...g, monto: 0 }));
     emitirCambio();
     await persistirDatos();
   }, []);
@@ -249,43 +213,16 @@ export function useGastos() {
     await persistirDatos();
   }, []);
 
-  const gastosDelMes = gastos.filter((g) => {
-    const fecha = new Date(g.fecha);
-    const ahora = new Date();
-    return (
-      fecha.getMonth()    === ahora.getMonth() &&
-      fecha.getFullYear() === ahora.getFullYear()
-    );
+  const gastosDelMes = gastos.filter(g => {
+    const d = new Date(g.fecha);
+    const n = new Date();
+    return d.getMonth() === n.getMonth() && d.getFullYear() === n.getFullYear();
   });
 
-  const totalMes = gastosDelMes.reduce((sum, g) => sum + g.monto, 0);
-
-  const porCategoria = gastosDelMes.reduce((acc, g) => {
-    acc[g.categoria] = (acc[g.categoria] || 0) + g.monto;
-    return acc;
-  }, {});
-
   return {
-    // Estado
-    gastos,
-    categorias,
-    cargando,
-    // Gastos derivados
-    gastosDelMes,
-    totalMes,
-    porCategoria,
-    // Acciones de gastos
-    agregarGasto,
-    eliminarGasto,
-    // Acciones de categorías
-    agregarCategoria,
-    editarCategoria,
-    eliminarCategoria,
-    // Acciones de opciones
-    limpiarGastos,
-    eliminarTodo,
-    // Exportar / Importar
-    exportarDatos,
-    importarDatos,
+    gastos, categorias, cargando, totalMes: gastosDelMes.reduce((s, g) => s + g.monto, 0),
+    gastosDelMes, porCategoria: gastosDelMes.reduce((a, g) => { a[g.categoria] = (a[g.categoria] || 0) + g.monto; return a; }, {}),
+    agregarGasto, eliminarGasto, agregarCategoria, editarCategoria, eliminarCategoria,
+    limpiarGastos, eliminarTodo, exportarDatos, importarDatos
   };
 }

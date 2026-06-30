@@ -23,26 +23,32 @@ export default function EstadisticasScreen() {
   const mesActual = new Date().toLocaleString('es-UY', { month: 'long' });
 
   const { chartData, totalCalculado } = useMemo(() => {
-    const entries = Object.entries(porCategoria);
-    const total = entries.reduce((acc, [_, monto]) => acc + monto, 0);
+      // 1. Obtenemos las entradas del objeto porCategoria
+      const entries = Object.entries(porCategoria);
 
-    const data = entries
-      .map(([nombreCat, monto]) => {
-        const encontrada = categorias.find(c => c.nombre === nombreCat);
-        const colorFinal = encontrada ? encontrada.color : '#CCC';
+      // 2. CALCULAMOS EL TOTAL REAL
+      const total = entries.reduce((acc, [_, monto]) => acc + monto, 0);
 
-        return {
-          value: monto,
-          color: colorFinal,
-          categoria: nombreCat,
-          monto,
-          text: nombreCat,
-        };
-      })
-      .sort((a, b) => b.monto - a.monto);
+      // 3. PROCESAMOS LOS DATOS
+      const data = entries
+        // AGREGAR ESTA LÍNEA: Filtra las categorías que tienen $0
+        .filter(([_, monto]) => monto > 0)
+        .map(([nombreCat, monto]) => {
+          const encontrada = categorias.find(c => c.nombre === nombreCat);
+          const colorFinal = encontrada ? encontrada.color : '#CCC';
 
-    return { chartData: data, totalCalculado: total };
-  }, [porCategoria, categorias]);
+          return {
+            value: monto,
+            color: colorFinal,
+            categoria: nombreCat,
+            monto,
+            text: nombreCat,
+          };
+        })
+        .sort((a, b) => b.monto - a.monto);
+
+      return { chartData: data, totalCalculado: total };
+    }, [porCategoria, categorias]);
 
   const pieData = chartData.map(({ value, color, text }) => ({ value, color, text }));
 

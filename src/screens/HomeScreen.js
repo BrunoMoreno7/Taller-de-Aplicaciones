@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   Text,
@@ -8,7 +8,7 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { MaterialCommunityIcons } from '@expo/vector-icons'; // Importación vital
 import AppHeader from '../components/AppHeader';
 import { useGastos } from '../hooks/useGastos';
 import { useTheme } from '../context/ThemeContext';
@@ -16,7 +16,8 @@ import { useTheme } from '../context/ThemeContext';
 function GastoItem({ item, onEliminar, categorias }) {
   const { theme } = useTheme();
 
-  const colorCat = categorias.find(c => c.nombre === item.categoria)?.color || '#CCC';
+  // Buscar color de la categoría de forma segura
+  const colorCat = categorias?.find(c => c.nombre === item.categoria)?.color || '#CCC';
 
   const fecha = new Date(item.fecha);
   const fechaStr = fecha.toLocaleDateString('es-UY', {
@@ -72,13 +73,17 @@ export default function HomeScreen({ navigation }) {
     year: 'numeric',
   });
 
-  // Pantalla de carga mientras AsyncStorage devuelve los datos
+  // Solo mostrar gastos mayores a 0 (para que funcione el reinicio a $0)
+  const gastosVisibles = useMemo(() => {
+    return (gastosDelMes || []).filter(g => g.monto > 0);
+  }, [gastosDelMes]);
+
   if (cargando) {
     return (
       <View style={[styles.container, styles.centered, { backgroundColor: theme.colors.background }]}>
         <ActivityIndicator size="large" color={accentColor} />
         <Text style={[styles.cargandoText, { color: theme.colors.text }]}>
-          Cargando tus gastos…
+          Cargando tus gastos...
         </Text>
       </View>
     );
@@ -86,6 +91,7 @@ export default function HomeScreen({ navigation }) {
 
   const renderEmpty = () => (
     <View style={styles.emptyContainer}>
+      <MaterialCommunityIcons name="wallet-outline" size={60} color={theme.colors.text} style={{opacity: 0.2, marginBottom: 10}} />
       <Text style={[styles.emptyTitle, { color: theme.colors.text }]}>Sin gastos este mes</Text>
       <Text style={styles.emptySubtitle}>
         Tocá el botón + para registrar tu primer gasto
@@ -113,7 +119,7 @@ export default function HomeScreen({ navigation }) {
         <Text style={[styles.sectionTitle, { color: theme.colors.text }]}>Últimos Gastos</Text>
 
         <FlatList
-          data={gastosDelMes}
+          data={gastosVisibles}
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
             <GastoItem
@@ -124,159 +130,98 @@ export default function HomeScreen({ navigation }) {
           )}
           ListEmptyComponent={renderEmpty}
           contentContainerStyle={
-            gastosDelMes.length === 0 ? styles.emptyList : styles.list
+            gastosVisibles.length === 0 ? styles.emptyList : styles.list
           }
           showsVerticalScrollIndicator={false}
         />
       </View>
 
+      {/* Botón FAB centrado perfectamente con Icono */}
       <TouchableOpacity
         style={[styles.fab, { backgroundColor: accentColor, shadowColor: accentColor }]}
         onPress={() => navigation.navigate('NuevoGasto')}
         activeOpacity={0.85}
       >
-        <Text style={styles.fabText}>+</Text>
+        <MaterialCommunityIcons name="plus" size={36} color="#FFFFFF" />
       </TouchableOpacity>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  centered: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 12,
-  },
-  cargandoText: {
-    fontSize: 15,
-    opacity: 0.6,
-  },
+  container: { flex: 1 },
+  centered: { justifyContent: 'center', alignItems: 'center' },
+  cargandoText: { fontSize: 15, marginTop: 10, opacity: 0.6 },
   resumenCard: {
     marginHorizontal: 16,
     marginTop: 16,
     marginBottom: 8,
-    borderRadius: 16,
-    padding: 20,
+    borderRadius: 20,
+    padding: 24,
     alignItems: 'center',
-    elevation: 3,
-    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
+    shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.3,
-    shadowRadius: 8,
+    shadowRadius: 10,
   },
   resumenLabel: {
     color: 'rgba(255,255,255,0.8)',
     fontSize: 13,
-    fontWeight: '500',
+    fontWeight: '600',
     textTransform: 'capitalize',
     marginBottom: 4,
   },
   resumenMonto: {
     color: '#FFFFFF',
-    fontSize: 36,
+    fontSize: 38,
     fontWeight: '900',
     letterSpacing: -1,
   },
-  resumenSub: {
-    color: 'rgba(255,255,255,0.7)',
-    fontSize: 12,
-    marginTop: 6,
-  },
-  listContainer: {
-    flex: 1,
-    paddingHorizontal: 16,
-  },
-  sectionTitle: {
-    fontSize: 22,
-    fontWeight: '900',
-    marginTop: 16,
-    marginBottom: 12,
-    letterSpacing: -0.5,
-  },
-  list: {
-    paddingBottom: 100,
-  },
-  emptyList: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingBottom: 80,
-  },
+  resumenSub: { color: 'rgba(255,255,255,0.7)', fontSize: 12, marginTop: 6 },
+  listContainer: { flex: 1, paddingHorizontal: 16 },
+  sectionTitle: { fontSize: 20, fontWeight: '900', marginTop: 16, marginBottom: 12 },
+  list: { paddingBottom: 100 },
+  emptyList: { flex: 1, justifyContent: 'center', alignItems: 'center', paddingBottom: 80 },
   gastoItem: {
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 14,
     marginBottom: 10,
     flexDirection: 'row',
     alignItems: 'center',
     elevation: 1,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.06,
-    shadowRadius: 3,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 5,
   },
   categoriaTag: {
-    borderRadius: 8,
+    borderRadius: 10,
     paddingHorizontal: 10,
     paddingVertical: 5,
-    marginRight: 10,
-    minWidth: 80,
+    marginRight: 12,
+    minWidth: 85,
     alignItems: 'center',
   },
-  categoriaText: {
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  gastoInfo: {
-    flex: 1,
-  },
-  descripcion: {
-    fontSize: 13,
-    fontWeight: '500',
-  },
-  fechaText: {
-    fontSize: 11,
-    color: '#888',
-    marginTop: 2,
-  },
-  montoText: {
-    fontSize: 16,
-    fontWeight: '800',
-    marginLeft: 8,
-  },
+  categoriaText: { fontSize: 11, fontWeight: '800' },
+  gastoInfo: { flex: 1 },
+  descripcion: { fontSize: 14, fontWeight: '600' },
+  fechaText: { fontSize: 11, color: '#888', marginTop: 2 },
+  montoText: { fontSize: 17, fontWeight: '800', marginLeft: 8 },
   fab: {
     position: 'absolute',
-    bottom: 24,
+    bottom: 30,
     right: 20,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     alignItems: 'center',
     justifyContent: 'center',
-    elevation: 6,
+    elevation: 8,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.4,
     shadowRadius: 8,
   },
-  fabText: {
-    color: '#FFFFFF',
-    fontSize: 28,
-    fontWeight: '300',
-    lineHeight: 32,
-  },
-  emptyContainer: {
-    alignItems: 'center',
-  },
-  emptyTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    marginBottom: 6,
-  },
-  emptySubtitle: {
-    fontSize: 14,
-    color: '#888',
-    textAlign: 'center',
-    paddingHorizontal: 20,
-  },
+  emptyContainer: { alignItems: 'center' },
+  emptyTitle: { fontSize: 18, fontWeight: '700', marginBottom: 6 },
+  emptySubtitle: { fontSize: 14, color: '#888', textAlign: 'center', paddingHorizontal: 30 },
 });
